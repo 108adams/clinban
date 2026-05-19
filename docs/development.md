@@ -1,0 +1,60 @@
+---
+title: Development
+kind: workflow
+scope: development
+summary: Records build, test, documentation, and maintenance workflows for Clinban.
+updated: 2026-05-19
+links:
+  - architecture
+  - documentation
+  - schema
+---
+
+# Development
+
+## Build
+
+```bash
+go build ./...
+```
+
+## Test
+
+```bash
+go test ./...
+```
+
+When the default Go cache is unavailable or read-only, use a writable cache:
+
+```bash
+GOCACHE=/tmp/go-trello-gocache go test ./...
+```
+
+## Vet
+
+```bash
+go vet ./...
+```
+
+## Documentation
+
+Go package documentation is written as doc comments and package-level `doc.go` files.
+
+```bash
+go doc ./internal/ticket
+go doc ./internal/store
+```
+
+Markdown project documentation lives under `docs/` and follows [Documentation Schema](schema.md).
+
+## Test Strategy
+
+Critical test areas:
+
+- Ticket parse/marshal semantics.
+- Lint rule coverage.
+- FSM transition matrix.
+- Store filesystem behavior with temporary directories.
+- CLI command smoke tests using scripted editors where needed.
+
+`internal/editor` is verified through CLI integration tests rather than unit tests because it spawns an OS process.

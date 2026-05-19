@@ -1,0 +1,45 @@
+---
+title: Configuration
+kind: reference
+scope: configuration
+summary: Describes .clinban configuration, project root discovery, and ticket directory defaults.
+updated: 2026-05-19
+links:
+  - cli
+  - storage
+  - product
+---
+
+# Configuration
+
+Clinban configuration lives in a `.clinban` TOML file at the project root.
+
+## File Format
+
+```toml
+tickets_dir = "tasks"
+archive_dir = "tasks/archive"
+```
+
+Both fields are optional.
+
+## Defaults
+
+If `.clinban` is absent:
+
+- `tickets_dir` defaults to the project root.
+- `archive_dir` defaults to `<tickets_dir>/archive`.
+
+If only `tickets_dir` is set, `archive_dir` defaults to `<tickets_dir>/archive`.
+
+## Path Resolution
+
+Relative paths are resolved against the project root. Absolute paths are used as provided.
+
+## Project Root Discovery
+
+The CLI walks upward from the current working directory looking for `.clinban`. If no config file is found, the current working directory is treated as the project root.
+
+## Malformed Config
+
+If `.clinban` exists but cannot be parsed as TOML, Clinban exits with an error.

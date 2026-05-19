@@ -31,7 +31,11 @@ func init() {
 	rootCmd.AddCommand(moveCmd)
 }
 
-// runMove is the handler for the move subcommand.
+// runMove applies a workflow transition to one ticket.
+//
+// The command validates the requested target status, enforces the state
+// machine, updates the ticket's status and updated timestamp, and handles the
+// archive-to-active reopen path for done -> backlog.
 func runMove(_ *cobra.Command, args []string) error {
 	id := args[0]
 	targetStr := args[1]

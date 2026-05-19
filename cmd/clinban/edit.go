@@ -32,6 +32,12 @@ func init() {
 	rootCmd.AddCommand(editCmd)
 }
 
+// runEdit opens a ticket in an editor and commits the edit only after parse and
+// lint both succeed.
+//
+// The live ticket is copied to a same-directory scratch file before the editor
+// opens. Invalid edits never replace the original unless the user reopens and
+// fixes them.
 func runEdit(cmd *cobra.Command, args []string) error {
 	id := args[0]
 
@@ -112,6 +118,7 @@ func runEdit(cmd *cobra.Command, args []string) error {
 	}
 }
 
+// promptReopen asks whether an invalid interactive edit should be reopened.
 func promptReopen() bool {
 	fmt.Fprint(os.Stderr, "Re-open in editor? [y/N] ")
 	scanner := bufio.NewScanner(os.Stdin)

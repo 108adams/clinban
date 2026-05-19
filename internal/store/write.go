@@ -8,7 +8,11 @@ import (
 	"clinban/internal/ticket"
 )
 
-// ReadTicket reads and parses the ticket file at the given path.
+// ReadTicket reads path and parses it as a Clinban ticket.
+//
+// The returned error wraps either the filesystem read error or the ticket parse
+// error. ReadTicket does not run lint; callers that need schema validation
+// should call package lint after a successful read.
 func (s *Store) ReadTicket(path string) (*ticket.Ticket, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -21,9 +25,12 @@ func (s *Store) ReadTicket(path string) (*ticket.Ticket, error) {
 	return t, nil
 }
 
-// WriteTicket serialises t and writes it atomically to path.
-// It writes to a temp file (path + ".tmp") in the same directory, then
-// renames it to the final path. Caller must set t.Updated before calling.
+// WriteTicket serialises t and writes it to path using a same-directory
+// temporary file followed by rename.
+//
+// The temporary file is created in the target directory so the final rename is
+// on the same filesystem. WriteTicket does not modify t; callers are responsible
+// for setting system-owned fields such as Updated before calling.
 func (s *Store) WriteTicket(t *ticket.Ticket, path string) error {
 	b, err := ticket.Marshal(t)
 	if err != nil {
@@ -58,14 +65,18 @@ func (s *Store) WriteTicket(t *ticket.Ticket, path string) error {
 	return nil
 }
 
-// TicketPath returns the canonical path for a ticket in TicketsDir,
-// formatted as <TicketsDir>/<id>-<slug>.md where id is zero-padded to 4 digits.
+// TicketPath returns the canonical active path for id and slug.
+//
+// The filename format is <id>-<slug>.md, with id rendered as a zero-padded
+// four-digit decimal number.
 func (s *Store) TicketPath(id int, slug string) string {
 	return filepath.Join(s.TicketsDir, fmt.Sprintf("%04d-%s.md", id, slug))
 }
 
-// ActivePath returns the path a ticket would have in TicketsDir, preserving
-// its filename. Used when moving a ticket from archive back to active.
+// ActivePath returns the active-directory path for archivePath's basename.
+//
+// It is used when moving a ticket from archive back to active while preserving
+// the existing filename.
 func (s *Store) ActivePath(archivePath string) string {
 	return filepath.Join(s.TicketsDir, filepath.Base(archivePath))
 }

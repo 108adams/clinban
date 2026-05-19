@@ -1,25 +1,114 @@
-# Console system for kanban board ticket management
+# Clinban
 
-The goal of this project - to deliver a program called "Clinban" which allows managing the kanban board in console/terminal window.
+Clinban is a small terminal kanban tool for software projects.
 
-The tickets for kanban board should be files in markdown with yaml header, they should use wiki capabilities of inter-connecting. Each ticket should track its status, tags and all the proper metadata needed to manage flow of the work. 
+It stores every ticket as a Markdown file with YAML frontmatter. There is no server, no database, no web UI, and no external service. Your work items live in the same repository as your code.
 
-## technology
-Golang in the newest version and its environment and packages ecosystm.
+## What Problem It Solves
 
-There is no database other than the files - all the project needs to be a git repo, trackable and versionable. The Clinban should treat given directory as the repository of work and properly manage the files as the part of the process. 
+Small software projects often track work in many scattered places:
 
-Integration with git is not needed - versioning will be handled independently.
+- notes in Markdown files
+- TODO lists
+- chat messages
+- issue trackers
+- prompts for AI coding agents
 
-## target architectures
-Linux and MacOS
+This creates a problem: the work is not always close to the code, and machines cannot reliably understand the state of the work.
 
-## Users
+Clinban solves this by making tickets simple files with a stable schema. Humans can read and edit them. Scripts, CI jobs, and LLM agents can also read and write them.
 
-### Humans
-The project is aimed at single develoer or a very small team developing an IT product. 
-The code usually is stored in a repository. I assume we can use the same repository for tickets.
+## How It Works
 
-### Automata
-Due to the open format of tickets I assume other actors - like CI/CD pipelines, testing infrastructure, LLM and AI developing tools and agents will be using the system extensively to track the work. Hence the shema for ticket document must be well prepared.
+A ticket is a Markdown file like this:
 
+```yaml
+---
+id: "0042"
+status: "in-progress"
+type: "bug"
+title: "Fix login timeout"
+tags: ["auth", "backend"]
+created: "2026-05-18T14:30:00Z"
+updated: "2026-05-18T15:00:00Z"
+---
+
+Notes about the work go here.
+```
+
+Active tickets stay in the configured ticket directory. Done tickets can be moved to an archive directory.
+
+The CLI can create, list, show, edit, move, archive, register, and lint tickets.
+
+## Main Ideas
+
+- Tickets are plain Markdown files.
+- YAML frontmatter is the schema.
+- The filesystem is the storage layer.
+- Git can version the tickets, but Clinban does not require git integration.
+- Humans and automata use the same ticket format.
+- `clinban lint` checks that ticket files follow the schema.
+
+## Technology
+
+Clinban is written in Go.
+
+The project uses:
+
+- Go standard library for filesystem and process work
+- Cobra for CLI commands
+- YAML and TOML libraries for ticket and config parsing
+- Markdown files as the data format
+
+Target platforms are Linux and macOS.
+
+## Who It Is For
+
+Clinban is designed for:
+
+- individual developers
+- very small teams
+- projects that already live in a code repository
+- workflows where LLM agents, scripts, or CI tools need to understand work items
+
+It is intentionally not a large project management system.
+
+## Documentation
+
+Start here:
+
+- [Documentation Index](docs/index.md)
+- [CLI Reference](docs/cli.md) - explains how to use each `clinban` command, including creation, listing, editing, moving, archiving, linting, and shell completion.
+- [Ticket Schema](docs/ticket-schema.md)
+- [Architecture](docs/architecture.md)
+
+The `docs/` directory is maintained as a lightweight project wiki for both humans and LLMs.
+
+## Development
+
+Run tests:
+
+```bash
+go test ./...
+```
+
+Run vet:
+
+```bash
+go vet ./...
+```
+
+If the Go build cache is read-only in a sandbox, use:
+
+```bash
+GOCACHE=/tmp/go-trello-gocache go test ./...
+GOCACHE=/tmp/go-trello-gocache go vet ./...
+```
+
+## Created With Human and LLM Collaboration
+
+Clinban was developed by Adam <108adams@gmail.com> together with LLM coding agents.
+
+Claude and Codex worked in sync during the project: planning, reviewing, implementing, documenting, and improving the codebase.
+
+The project itself reflects that collaboration model. Its files are meant to be understandable not only by humans, but also by future LLM agents that may help maintain and extend it.

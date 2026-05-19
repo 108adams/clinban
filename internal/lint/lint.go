@@ -6,10 +6,13 @@ import (
 	"clinban/internal/ticket"
 )
 
-// LintError represents a single schema violation found in a ticket file.
+// LintError is a single schema violation found in a ticket file.
 type LintError struct {
-	File    string // base filename only, not a full path
-	Field   string
+	// File is the base filename reported to users, not an absolute path.
+	File string
+	// Field is the schema field associated with the violation.
+	Field string
+	// Message explains the violation in user-facing language.
 	Message string
 }
 
@@ -20,7 +23,7 @@ func (e LintError) String() string {
 	return fmt.Sprintf("%s: field '%s': %s", e.File, e.Field, e.Message)
 }
 
-// Error implements the error interface so LintError can be used as an error value.
+// Error implements the error interface by returning String.
 func (e LintError) Error() string {
 	return e.String()
 }
@@ -39,9 +42,12 @@ var rules = []ruleFunc{
 	ruleIDUnique,          // 7
 }
 
-// Lint runs all 7 rules against the ticket in order and returns every violation
-// found. filename is the base filename (used in error output and for rule 4).
-// allIDs is the full list of IDs across active + archive (used for rule 7).
+// Lint runs all schema rules against t and returns every violation found.
+//
+// The filename argument should be the base filename used for user-facing error
+// output and for the rule that checks whether the filename prefix matches the
+// ticket ID. The allIDs argument is the repository context used for uniqueness
+// checks across active and archived tickets.
 //
 // Returns an empty (never nil) slice when the ticket is valid.
 func Lint(t *ticket.Ticket, filename string, allIDs []string) []LintError {

@@ -17,9 +17,11 @@ type templateData struct {
 	Now time.Time
 }
 
-// New returns the embedded new-ticket template rendered with id and now
-// pre-filled. The title and type fields are left as empty strings for the
-// user to complete in their editor.
+// New renders the embedded new-ticket template for id and now.
+//
+// The returned bytes are a complete Markdown ticket file with system-owned
+// fields pre-filled. User-owned fields such as title and type are intentionally
+// blank so the interactive creation flow can detect an unchanged template.
 func New(id int, now time.Time) ([]byte, error) {
 	tmpl, err := template.New("ticket").Parse(newMD)
 	if err != nil {

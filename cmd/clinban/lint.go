@@ -30,7 +30,7 @@ func init() {
 	rootCmd.AddCommand(lintCmd)
 }
 
-// runLint is the handler for the lint subcommand.
+// runLint dispatches lint to whole-repository or single-ticket validation.
 func runLint(_ *cobra.Command, args []string) error {
 	if len(args) == 1 {
 		return runLintSingle(args[0])
@@ -38,7 +38,7 @@ func runLint(_ *cobra.Command, args []string) error {
 	return runLintAll()
 }
 
-// runLintSingle lints a single ticket identified by id.
+// runLintSingle validates one active or archived ticket by ID.
 func runLintSingle(id string) error {
 	path, _, err := st.FindByID(id)
 	if err != nil {
@@ -64,7 +64,8 @@ func runLintSingle(id string) error {
 	return reportLintErrors(errs)
 }
 
-// runLintAll lints all tickets in the active and archive directories.
+// runLintAll validates every managed ticket in the active and archive
+// directories.
 func runLintAll() error {
 	allIDs, err := st.AllIDs()
 	if err != nil {
@@ -91,8 +92,10 @@ func runLintAll() error {
 	return reportLintErrors(allErrors)
 }
 
-// reportLintErrors prints each LintError to stdout and exits 1 when there are
-// any errors. Returns nil (exit 0) when the slice is empty.
+// reportLintErrors prints lint errors in the CLI's canonical output format.
+//
+// Lint violations are normal command output, so they are written to stdout. An
+// empty slice means validation succeeded.
 func reportLintErrors(errs []lint.LintError) error {
 	if len(errs) == 0 {
 		return nil

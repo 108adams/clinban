@@ -7,17 +7,23 @@ import (
 	"clinban/internal/ticket"
 )
 
-// ErrNotFound is returned by FindByID when no ticket file matches the given ID.
+// ErrNotFound is returned by FindByID when no active or archived ticket file
+// matches the requested ID.
 var ErrNotFound = errors.New("ticket not found")
 
-// Store manages ticket files on disk. It knows the locations of the active
-// tickets directory and the archive directory.
+// Store manages ticket files on disk.
+//
+// Store owns filesystem concerns only: locating, reading, writing, listing, and
+// moving ticket files. It does not enforce schema validity or workflow
+// transitions.
 type Store struct {
+	// TicketsDir is the directory containing active ticket files.
 	TicketsDir string
+	// ArchiveDir is the directory containing archived ticket files.
 	ArchiveDir string
 }
 
-// New constructs a Store from the provided configuration.
+// New constructs a Store from cfg.
 func New(cfg *config.Config) *Store {
 	return &Store{
 		TicketsDir: cfg.TicketsDir,
@@ -25,9 +31,12 @@ func New(cfg *config.Config) *Store {
 	}
 }
 
-// Record pairs a parsed Ticket with its filesystem location and archive status.
+// Record pairs a parsed ticket with its filesystem location.
 type Record struct {
-	Ticket    *ticket.Ticket
-	Path      string
+	// Ticket is the parsed ticket content.
+	Ticket *ticket.Ticket
+	// Path is the full filesystem path from which Ticket was read.
+	Path string
+	// InArchive reports whether Path is under the configured archive directory.
 	InArchive bool
 }

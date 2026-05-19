@@ -10,22 +10,32 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ErrMissingFrontmatter is returned by Parse when the content does not contain
-// a valid --- fenced frontmatter block.
+// ErrMissingFrontmatter is returned by Parse when content does not start with a
+// complete --- fenced frontmatter block.
 var ErrMissingFrontmatter = errors.New("ticket: parse: missing frontmatter")
 
-// Ticket is the in-memory representation of a clinban ticket file.
-// Fields map directly to the YAML frontmatter schema.
-// Body holds the markdown content after the closing --- fence.
+// Ticket is the in-memory representation of a Clinban ticket file.
+//
+// The exported fields map directly to the public YAML frontmatter schema except
+// for Body, which contains the Markdown content after the closing frontmatter
+// fence.
 type Ticket struct {
-	ID      string    `yaml:"id"`
-	Status  Status    `yaml:"status"`
-	Type    Type      `yaml:"type"`
-	Title   string    `yaml:"title"`
-	Tags    []string  `yaml:"tags"`
+	// ID is the zero-padded four-digit ticket identifier, for example "0042".
+	ID string `yaml:"id"`
+	// Status is the current workflow state.
+	Status Status `yaml:"status"`
+	// Type is the ticket's controlled category.
+	Type Type `yaml:"type"`
+	// Title is the short human-readable ticket summary.
+	Title string `yaml:"title"`
+	// Tags are optional free-form labels.
+	Tags []string `yaml:"tags"`
+	// Created is the timestamp assigned when Clinban created or registered the ticket.
 	Created time.Time `yaml:"created"`
+	// Updated is refreshed by Clinban writes that modify ticket content or state.
 	Updated time.Time `yaml:"updated"`
-	Body    string    // markdown body; not part of YAML frontmatter
+	// Body is the Markdown content after the YAML frontmatter.
+	Body string
 }
 
 // frontmatter is the YAML-encodable shape of a ticket's header fields.
@@ -43,8 +53,7 @@ type frontmatter struct {
 
 const fence = "---"
 
-// Parse splits content on --- fences, decodes the YAML frontmatter block,
-// and captures the remainder as Body.
+// Parse decodes a Markdown ticket file into a Ticket.
 //
 // The expected format is:
 //
@@ -53,8 +62,9 @@ const fence = "---"
 //	---\n
 //	<optional body>
 //
-// Returns ErrMissingFrontmatter if the opening or closing fence is absent.
-// Returns a wrapped yaml decode error if the frontmatter block is malformed.
+// Parse returns ErrMissingFrontmatter when the opening or closing fence is
+// absent. It returns a wrapped YAML error when the frontmatter block is
+// syntactically malformed.
 func Parse(content []byte) (*Ticket, error) {
 	s := string(content)
 
@@ -98,11 +108,10 @@ func Parse(content []byte) (*Ticket, error) {
 	}, nil
 }
 
-// Marshal serialises the ticket back to --- fenced YAML frontmatter followed
-// by the Body. The output is suitable for writing directly to a .md file.
+// Marshal encodes t as a Markdown ticket file.
 //
-// Tags serialises as `tags: []` when empty (flow style), matching the schema
-// contract that the field is always present.
+// The output contains --- fenced YAML frontmatter followed by t.Body. Tags are
+// always emitted, and an empty tag list is serialized as tags: [].
 func Marshal(t *Ticket) ([]byte, error) {
 	tags := t.Tags
 	if tags == nil {

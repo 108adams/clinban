@@ -9,20 +9,30 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// ErrMalformedConfig is returned when the .clinban file exists but cannot be parsed as valid TOML.
+// ErrMalformedConfig is wrapped by Load when .clinban exists but cannot be
+// parsed as TOML.
 var ErrMalformedConfig = errors.New("config: malformed .clinban file")
 
-// Config holds the resolved configuration for a Clinban project.
+// Config is the resolved filesystem layout for a Clinban project.
+//
+// Both paths are absolute or relative exactly as returned by Load after
+// resolving .clinban values against the project root.
 type Config struct {
+	// TicketsDir is the directory containing active ticket files.
 	TicketsDir string `toml:"tickets_dir"`
+	// ArchiveDir is the directory containing archived ticket files.
 	ArchiveDir string `toml:"archive_dir"`
 }
 
-// Load reads .clinban from projectRoot.
-// If the file is absent, returns defaults silently (no error).
-// If the file exists but is malformed TOML, returns a non-nil error.
-// Partial configs are valid; unset fields fall back to defaults.
-// Defaults: TicketsDir = projectRoot, ArchiveDir = projectRoot/archive.
+// Load reads .clinban from projectRoot and returns the resolved configuration.
+//
+// If .clinban is absent, Load returns defaults without error. If .clinban is
+// present but malformed, Load returns an error wrapping ErrMalformedConfig.
+// Partial configs are valid: omitted fields fall back to defaults. Relative
+// paths are resolved against projectRoot.
+//
+// The default layout uses projectRoot for active tickets and
+// projectRoot/archive for archived tickets.
 func Load(projectRoot string) (*Config, error) {
 	configPath := filepath.Join(projectRoot, ".clinban")
 

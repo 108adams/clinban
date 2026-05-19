@@ -4,11 +4,11 @@ import (
 	"strings"
 )
 
-// Slugify returns the first 5 words of title, lowercased,
-// joined with hyphens, all non-alphanumeric characters stripped.
-// Short titles (< 5 words) use all words.
-// Tokens that become empty after stripping are skipped and do not
-// count toward the 5-word limit.
+// Slugify converts title into a filesystem-safe ticket filename slug.
+//
+// The slug is built from up to five non-empty tokens. Each token is lowercased,
+// stripped to ASCII letters and digits, and joined with hyphens. Tokens that
+// become empty after stripping are skipped and do not count toward the limit.
 func Slugify(title string) string {
 	const maxTokens = 5
 

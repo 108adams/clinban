@@ -14,8 +14,7 @@ import (
 	"clinban/internal/ticket"
 )
 
-// statusOrder defines the display sort order for each status value.
-// Lower number = listed first.
+// statusOrder defines the list display order. Lower values sort earlier.
 var statusOrder = map[ticket.Status]int{
 	ticket.StatusInProgress: 0,
 	ticket.StatusBlocked:    1,
@@ -51,7 +50,7 @@ func init() {
 	rootCmd.AddCommand(listCmd)
 }
 
-// runList is the handler for the list subcommand.
+// runList prints active tickets, optionally filtered by status, type, and tag.
 func runList(_ *cobra.Command, _ []string) error {
 	records, err := st.ListActive()
 	if err != nil {
@@ -78,8 +77,10 @@ func runList(_ *cobra.Command, _ []string) error {
 	return nil
 }
 
-// applyFilters returns the subset of records that match all non-empty flags.
-// Returns an error if any flag value is invalid.
+// applyFilters returns records matching all non-empty list flags.
+//
+// Status and type filters are validated before filtering so the command fails
+// clearly on misspelled controlled-vocabulary values.
 func applyFilters(records []store.Record, opts listFlags) ([]store.Record, error) {
 	// Validate flag values upfront.
 	if opts.status != "" {
@@ -121,8 +122,7 @@ func hasTag(tags []string, target string) bool {
 	return false
 }
 
-// sortRecords sorts in-place: in-progress first, blocked second, backlog third,
-// done last; ascending by numeric ID within each group.
+// sortRecords sorts records in the documented board order, then by numeric ID.
 func sortRecords(records []store.Record) {
 	sort.SliceStable(records, func(i, j int) bool {
 		oi := statusOrder[records[i].Ticket.Status]
@@ -147,8 +147,11 @@ func terminalWidth() int {
 	return w
 }
 
-// formatRecord formats a single record as a fixed line truncated to width.
-// Format: <id>  <status>  <type>  <title>
+// formatRecord formats one list row and truncates the title to width.
+//
+// The row format is:
+//
+//	<id>  <status>  <type>  <title>
 func formatRecord(r store.Record, width int) string {
 	id := r.Ticket.ID
 	status := string(r.Ticket.Status)

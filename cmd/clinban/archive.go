@@ -30,7 +30,7 @@ func init() {
 	rootCmd.AddCommand(archiveCmd)
 }
 
-// runArchive is the handler for the archive subcommand.
+// runArchive dispatches archive to the single-ticket or bulk archive flow.
 func runArchive(_ *cobra.Command, args []string) error {
 	if len(args) == 1 {
 		return runArchiveSingle(args[0])
@@ -38,9 +38,10 @@ func runArchive(_ *cobra.Command, args []string) error {
 	return runArchiveBulk()
 }
 
-// runArchiveSingle archives a single ticket identified by id.
-// The ticket must have status=done; otherwise an error is printed and the
-// process exits with code 1.
+// runArchiveSingle archives one done ticket identified by id.
+//
+// The ticket must already be in the done status. The store layer handles
+// archive directory creation and destination collision checks.
 func runArchiveSingle(id string) error {
 	path, _, err := st.FindByID(id)
 	if err != nil {
@@ -69,8 +70,7 @@ func runArchiveSingle(id string) error {
 	return nil
 }
 
-// runArchiveBulk finds all done tickets in the active directory, lists them,
-// prompts the user for confirmation, and moves them to the archive directory.
+// runArchiveBulk prompts to archive every done ticket in the active directory.
 func runArchiveBulk() error {
 	records, err := st.ListActive()
 	if err != nil {

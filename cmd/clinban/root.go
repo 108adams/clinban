@@ -49,14 +49,18 @@ archived when done.`,
 	},
 }
 
-// Execute runs the root command. main calls this and exits 1 on error.
+// Execute runs the Clinban root command.
+//
+// It is separated from main so command tests can execute the CLI entry point
+// without duplicating process setup.
 func Execute() error {
 	return rootCmd.Execute()
 }
 
-// findProjectRoot walks up from the current working directory looking for a
-// .clinban config file. Returns the directory that contains .clinban, or the
-// current working directory if no .clinban is found in any ancestor.
+// findProjectRoot walks upward from the current directory looking for .clinban.
+//
+// If no config file is found in any ancestor, the current working directory is
+// treated as the project root.
 func findProjectRoot() string {
 	cwd, err := os.Getwd()
 	if err != nil {

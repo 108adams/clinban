@@ -29,7 +29,7 @@ func init() {
 	rootCmd.AddCommand(showCmd)
 }
 
-// runShow is the handler for the show subcommand.
+// runShow prints a single active or archived ticket without modifying it.
 func runShow(_ *cobra.Command, args []string) error {
 	id := args[0]
 

@@ -6,9 +6,11 @@ import (
 	"os/exec"
 )
 
-// Open launches $EDITOR (fallback: "vi") with path as argument.
-// Stdin, Stdout, and Stderr are inherited from the parent process.
-// Returns error if the editor process exits non-zero.
+// Open launches the configured editor for path and waits for it to exit.
+//
+// EDITOR is used when set; otherwise Open falls back to vi. The child process
+// inherits stdin, stdout, and stderr so interactive editors behave normally.
+// A non-zero editor exit status is returned as an error.
 func Open(path string) error {
 	editor := os.Getenv("EDITOR")
 	if editor == "" {

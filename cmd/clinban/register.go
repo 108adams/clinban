@@ -31,7 +31,12 @@ func init() {
 	rootCmd.AddCommand(registerCmd)
 }
 
-// runRegister is the handler for the register subcommand.
+// runRegister adopts an externally authored ticket file into the active
+// Clinban registry.
+//
+// Registration overwrites system-owned fields, validates the resulting ticket,
+// writes it to its canonical filename, and removes the source file after a
+// successful write.
 func runRegister(_ *cobra.Command, args []string) error {
 	srcPath := args[0]
 

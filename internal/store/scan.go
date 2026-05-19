@@ -67,8 +67,11 @@ func scanDirIDs(dir string) ([]string, error) {
 	return ids, nil
 }
 
-// NextID scans TicketsDir and ArchiveDir for the highest numeric filename
-// prefix matching [0-9]{4}-*.md, and returns that value + 1.
+// NextID scans TicketsDir and ArchiveDir and returns the next available numeric
+// ticket ID.
+//
+// IDs are discovered from filenames matching the managed ticket convention
+// [0-9]{4}-*.md. Files that do not match that convention are ignored.
 // Returns 1 if no matching files exist.
 func (s *Store) NextID() (int, error) {
 	active, err := scanDir(s.TicketsDir)
@@ -94,10 +97,10 @@ func (s *Store) NextID() (int, error) {
 	return max + 1, nil
 }
 
-// FindByID locates a ticket file by its 4-digit ID prefix string.
-// Searches TicketsDir first, then ArchiveDir.
-// Returns the full path, whether it is in the archive, and any error.
-// Returns ("", false, ErrNotFound) if the ID does not exist.
+// FindByID locates a managed ticket file by its four-digit ID prefix.
+//
+// Active tickets are searched before archived tickets. If no matching file is
+// found, FindByID returns ErrNotFound.
 func (s *Store) FindByID(id string) (path string, inArchive bool, err error) {
 	for _, dir := range []string{s.TicketsDir, s.ArchiveDir} {
 		entries, readErr := os.ReadDir(dir)
@@ -124,8 +127,11 @@ func (s *Store) FindByID(id string) (path string, inArchive bool, err error) {
 	return "", false, ErrNotFound
 }
 
-// AllIDs returns every ID string (numeric prefix) found in *.md files in
-// both TicketsDir and ArchiveDir. Used by lint for uniqueness checking.
+// AllIDs returns every managed ticket ID found in active and archived
+// filenames.
+//
+// The returned IDs are the zero-padded filename prefixes used by lint for
+// repository-wide uniqueness checks.
 func (s *Store) AllIDs() ([]string, error) {
 	active, err := scanDirIDs(s.TicketsDir)
 	if err != nil {
@@ -175,13 +181,17 @@ func (s *Store) listDir(dir string, inArchive bool) ([]Record, error) {
 	return records, nil
 }
 
-// ListActive returns all tickets in TicketsDir as Records.
+// ListActive returns managed tickets in TicketsDir as Records.
+//
+// Only files following the managed ticket filename convention are parsed.
 // Returns an empty (never nil) slice if the directory is empty or absent.
 func (s *Store) ListActive() ([]Record, error) {
 	return s.listDir(s.TicketsDir, false)
 }
 
-// ListArchive returns all tickets in ArchiveDir as Records.
+// ListArchive returns managed tickets in ArchiveDir as Records.
+//
+// Only files following the managed ticket filename convention are parsed.
 // Returns an empty (never nil) slice if the directory is empty or absent.
 func (s *Store) ListArchive() ([]Record, error) {
 	return s.listDir(s.ArchiveDir, true)

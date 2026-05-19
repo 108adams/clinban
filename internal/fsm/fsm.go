@@ -15,9 +15,13 @@ var transitions = map[ticket.Status][]ticket.Status{
 	ticket.StatusDone:       {ticket.StatusBacklog},
 }
 
-// ValidateTransition returns nil if the transition from→to is in the valid
-// transitions table. For any forbidden transition it returns a descriptive
-// error that lists the valid next statuses for from.
+// ValidateTransition reports whether a ticket may move from one status to
+// another.
+//
+// A nil error means the transition is explicitly allowed by Clinban's workflow.
+// A non-nil error means the transition is forbidden; the error message includes
+// the valid next statuses for from. Self-transitions are not valid here. The CLI
+// move command handles no-op self-transitions before calling ValidateTransition.
 func ValidateTransition(from, to ticket.Status) error {
 	nexts, ok := transitions[from]
 	if ok {
