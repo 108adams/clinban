@@ -2,7 +2,6 @@ package main_test
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -78,9 +77,9 @@ func runList(t *testing.T, bin, workDir string, args ...string) (stdout, stderr 
 func TestListNoTickets(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	stdout, stderr, code := runList(t, bin, dir)
+	stdout, stderr, code := runList(t, bin, root)
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0; stderr=%q", code, stderr)
@@ -95,11 +94,11 @@ func TestListNoTickets(t *testing.T) {
 func TestListNoMatchingFilter(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeListTicket(t, dir, listTestID1, "backlog", "task", "Fix login timeout", nil)
+	writeListTicket(t, ticketsDir, listTestID1, "backlog", "task", "Fix login timeout", nil)
 
-	stdout, _, code := runList(t, bin, dir, "--status", "in-progress")
+	stdout, _, code := runList(t, bin, root, "--status", "in-progress")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0", code)
@@ -114,12 +113,12 @@ func TestListNoMatchingFilter(t *testing.T) {
 func TestListAllTicketsUnfiltered(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeListTicket(t, dir, listTestID1, "backlog", "task", "Fix login timeout", nil)
-	writeListTicket(t, dir, listTestID2, "in-progress", "bug", "Auth loop crash", nil)
+	writeListTicket(t, ticketsDir, listTestID1, "backlog", "task", "Fix login timeout", nil)
+	writeListTicket(t, ticketsDir, listTestID2, "in-progress", "bug", "Auth loop crash", nil)
 
-	stdout, stderr, code := runList(t, bin, dir)
+	stdout, stderr, code := runList(t, bin, root)
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0; stderr=%q", code, stderr)
@@ -137,14 +136,14 @@ func TestListAllTicketsUnfiltered(t *testing.T) {
 func TestListSortOrder(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeListTicket(t, dir, listTestID1, "done", "task", "Done ticket", nil)
-	writeListTicket(t, dir, listTestID2, "backlog", "task", "Backlog ticket", nil)
-	writeListTicket(t, dir, listTestID3, "blocked", "task", "Blocked ticket", nil)
-	writeListTicket(t, dir, listTestID4, "in-progress", "task", "In progress ticket", nil)
+	writeListTicket(t, ticketsDir, listTestID1, "done", "task", "Done ticket", nil)
+	writeListTicket(t, ticketsDir, listTestID2, "backlog", "task", "Backlog ticket", nil)
+	writeListTicket(t, ticketsDir, listTestID3, "blocked", "task", "Blocked ticket", nil)
+	writeListTicket(t, ticketsDir, listTestID4, "in-progress", "task", "In progress ticket", nil)
 
-	stdout, _, code := runList(t, bin, dir)
+	stdout, _, code := runList(t, bin, root)
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0", code)
@@ -185,14 +184,14 @@ func TestListSortOrder(t *testing.T) {
 func TestListSortOrderWithinGroup(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	// Write in reverse ID order so we can confirm sorting puts them right.
-	writeListTicket(t, dir, "0003", "backlog", "task", "Third ticket", nil)
-	writeListTicket(t, dir, "0001", "backlog", "task", "First ticket", nil)
-	writeListTicket(t, dir, "0002", "backlog", "task", "Second ticket", nil)
+	writeListTicket(t, ticketsDir, "0003", "backlog", "task", "Third ticket", nil)
+	writeListTicket(t, ticketsDir, "0001", "backlog", "task", "First ticket", nil)
+	writeListTicket(t, ticketsDir, "0002", "backlog", "task", "Second ticket", nil)
 
-	stdout, _, code := runList(t, bin, dir)
+	stdout, _, code := runList(t, bin, root)
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0", code)
@@ -215,12 +214,12 @@ func TestListSortOrderWithinGroup(t *testing.T) {
 func TestListFilterByStatus(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeListTicket(t, dir, listTestID1, "backlog", "task", "Backlog ticket", nil)
-	writeListTicket(t, dir, listTestID2, "in-progress", "task", "In progress ticket", nil)
+	writeListTicket(t, ticketsDir, listTestID1, "backlog", "task", "Backlog ticket", nil)
+	writeListTicket(t, ticketsDir, listTestID2, "in-progress", "task", "In progress ticket", nil)
 
-	stdout, _, code := runList(t, bin, dir, "--status", "in-progress")
+	stdout, _, code := runList(t, bin, root, "--status", "in-progress")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0", code)
@@ -241,12 +240,12 @@ func TestListFilterByStatus(t *testing.T) {
 func TestListFilterByType(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeListTicket(t, dir, listTestID1, "backlog", "bug", "Bug ticket", nil)
-	writeListTicket(t, dir, listTestID2, "backlog", "task", "Task ticket", nil)
+	writeListTicket(t, ticketsDir, listTestID1, "backlog", "bug", "Bug ticket", nil)
+	writeListTicket(t, ticketsDir, listTestID2, "backlog", "task", "Task ticket", nil)
 
-	stdout, _, code := runList(t, bin, dir, "--type", "bug")
+	stdout, _, code := runList(t, bin, root, "--type", "bug")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0", code)
@@ -264,12 +263,12 @@ func TestListFilterByType(t *testing.T) {
 func TestListFilterByTag(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeListTicket(t, dir, listTestID1, "backlog", "task", "Tagged ticket", []string{"auth", "urgent"})
-	writeListTicket(t, dir, listTestID2, "backlog", "task", "Untagged ticket", nil)
+	writeListTicket(t, ticketsDir, listTestID1, "backlog", "task", "Tagged ticket", []string{"auth", "urgent"})
+	writeListTicket(t, ticketsDir, listTestID2, "backlog", "task", "Untagged ticket", nil)
 
-	stdout, _, code := runList(t, bin, dir, "--tag", "auth")
+	stdout, _, code := runList(t, bin, root, "--tag", "auth")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0", code)
@@ -287,14 +286,14 @@ func TestListFilterByTag(t *testing.T) {
 func TestListFilterCombined(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	// Only ticket 2 should match: status=backlog AND type=bug.
-	writeListTicket(t, dir, listTestID1, "backlog", "task", "Backlog task", nil)
-	writeListTicket(t, dir, listTestID2, "backlog", "bug", "Backlog bug", nil)
-	writeListTicket(t, dir, listTestID3, "in-progress", "bug", "In-progress bug", nil)
+	writeListTicket(t, ticketsDir, listTestID1, "backlog", "task", "Backlog task", nil)
+	writeListTicket(t, ticketsDir, listTestID2, "backlog", "bug", "Backlog bug", nil)
+	writeListTicket(t, ticketsDir, listTestID3, "in-progress", "bug", "In-progress bug", nil)
 
-	stdout, _, code := runList(t, bin, dir, "--status", "backlog", "--type", "bug")
+	stdout, _, code := runList(t, bin, root, "--status", "backlog", "--type", "bug")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0", code)
@@ -313,11 +312,11 @@ func TestListFilterCombined(t *testing.T) {
 func TestListOutputColumns(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeListTicket(t, dir, listTestID1, "backlog", "task", "Fix login timeout", nil)
+	writeListTicket(t, ticketsDir, listTestID1, "backlog", "task", "Fix login timeout", nil)
 
-	stdout, _, code := runList(t, bin, dir)
+	stdout, _, code := runList(t, bin, root)
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0", code)
@@ -338,9 +337,9 @@ func TestListOutputColumns(t *testing.T) {
 func TestListInvalidStatus(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	_, stderr, code := runList(t, bin, dir, "--status", "invalid-status")
+	_, stderr, code := runList(t, bin, root, "--status", "invalid-status")
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)
@@ -355,9 +354,9 @@ func TestListInvalidStatus(t *testing.T) {
 func TestListInvalidType(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	_, stderr, code := runList(t, bin, dir, "--type", "invalid-type")
+	_, stderr, code := runList(t, bin, root, "--type", "invalid-type")
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)
@@ -372,16 +371,12 @@ func TestListInvalidType(t *testing.T) {
 func TestListDoesNotIncludeArchive(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, archiveDir := setupWorkDir(t)
 
 	// Write a ticket in the archive directory.
-	archiveDir := fmt.Sprintf("%s/archive", dir)
-	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
 	writeListTicket(t, archiveDir, listTestID1, "done", "task", "Archived ticket", nil)
 
-	stdout, _, code := runList(t, bin, dir)
+	stdout, _, code := runList(t, bin, root)
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0", code)
@@ -395,9 +390,9 @@ func TestListDoesNotIncludeArchive(t *testing.T) {
 func TestListHelpFlag(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	stdout, _, code := runList(t, bin, dir, "--help")
+	stdout, _, code := runList(t, bin, root, "--help")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0", code)

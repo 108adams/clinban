@@ -87,11 +87,11 @@ func runArchive(t *testing.T, bin, workDir string, stdinInput string, args ...st
 func TestArchiveSingleHappyPath(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, archiveDir := setupWorkDir(t)
 
-	writeTicket(t, dir, archiveTestDoneFile, doneTicketContent(archiveTestDoneID))
+	writeTicket(t, ticketsDir, archiveTestDoneFile, doneTicketContent(archiveTestDoneID))
 
-	stdout, stderr, code := runArchive(t, bin, dir, "", archiveTestDoneID)
+	stdout, stderr, code := runArchive(t, bin, root, "", archiveTestDoneID)
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -101,12 +101,12 @@ func TestArchiveSingleHappyPath(t *testing.T) {
 	}
 
 	// The ticket must no longer be in the active directory.
-	if _, err := os.Stat(filepath.Join(dir, archiveTestDoneFile)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(ticketsDir, archiveTestDoneFile)); !os.IsNotExist(err) {
 		t.Error("ticket still exists in active directory after archiving")
 	}
 
 	// The ticket must now be in the archive directory.
-	archivePath := filepath.Join(dir, "archive", archiveTestDoneFile)
+	archivePath := filepath.Join(archiveDir, archiveTestDoneFile)
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("ticket not found in archive directory: %v", err)
 	}
@@ -117,10 +117,10 @@ func TestArchiveSingleHappyPath(t *testing.T) {
 func TestArchiveSingleNotFound(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
 	// No tickets in dir.
-	_, stderr, code := runArchive(t, bin, dir, "", "9999")
+	_, stderr, code := runArchive(t, bin, root, "", "9999")
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)
@@ -135,11 +135,11 @@ func TestArchiveSingleNotFound(t *testing.T) {
 func TestArchiveSingleNotDone(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, archiveTestActiveFile, inProgressTicketContent(archiveTestActiveID))
+	writeTicket(t, ticketsDir, archiveTestActiveFile, inProgressTicketContent(archiveTestActiveID))
 
-	_, stderr, code := runArchive(t, bin, dir, "", archiveTestActiveID)
+	_, stderr, code := runArchive(t, bin, root, "", archiveTestActiveID)
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1; stderr=%q", code, stderr)
@@ -149,7 +149,7 @@ func TestArchiveSingleNotDone(t *testing.T) {
 	}
 
 	// The ticket must still be in the active directory.
-	if _, err := os.Stat(filepath.Join(dir, archiveTestActiveFile)); err != nil {
+	if _, err := os.Stat(filepath.Join(ticketsDir, archiveTestActiveFile)); err != nil {
 		t.Errorf("ticket unexpectedly missing from active directory: %v", err)
 	}
 }
@@ -159,17 +159,24 @@ func TestArchiveSingleNotDone(t *testing.T) {
 func TestArchiveSingleCreatesArchiveDir(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
 
-	writeTicket(t, dir, archiveTestDoneFile, doneTicketContent(archiveTestDoneID))
+	// Manually create only root/tickets/ so that archive/ does NOT exist yet —
+	// the command itself must create it.
+	root := t.TempDir()
+	ticketsDir := filepath.Join(root, "tickets")
+	if err := os.MkdirAll(ticketsDir, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
 
-	// Ensure archive dir does NOT exist yet.
-	archiveDir := filepath.Join(dir, "archive")
+	writeTicket(t, ticketsDir, archiveTestDoneFile, doneTicketContent(archiveTestDoneID))
+
+	// Confirm archive dir does NOT exist yet.
+	archiveDir := filepath.Join(ticketsDir, "archive")
 	if _, err := os.Stat(archiveDir); !os.IsNotExist(err) {
 		t.Skip("archive dir already exists, test precondition not met")
 	}
 
-	_, _, code := runArchive(t, bin, dir, "", archiveTestDoneID)
+	_, _, code := runArchive(t, bin, root, "", archiveTestDoneID)
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0", code)
@@ -184,11 +191,11 @@ func TestArchiveSingleCreatesArchiveDir(t *testing.T) {
 func TestArchiveBulkNoDoneTickets(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, archiveTestActiveFile, inProgressTicketContent(archiveTestActiveID))
+	writeTicket(t, ticketsDir, archiveTestActiveFile, inProgressTicketContent(archiveTestActiveID))
 
-	stdout, stderr, code := runArchive(t, bin, dir, "")
+	stdout, stderr, code := runArchive(t, bin, root, "")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -203,9 +210,9 @@ func TestArchiveBulkNoDoneTickets(t *testing.T) {
 func TestArchiveBulkEmpty(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	stdout, stderr, code := runArchive(t, bin, dir, "")
+	stdout, stderr, code := runArchive(t, bin, root, "")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -220,14 +227,14 @@ func TestArchiveBulkEmpty(t *testing.T) {
 func TestArchiveBulkConfirmYes(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, archiveDir := setupWorkDir(t)
 
-	writeTicket(t, dir, archiveTestDoneFile, doneTicketContent(archiveTestDoneID))
-	writeTicket(t, dir, archiveTestDoneFile2, doneTicketContent(archiveTestDoneID2))
+	writeTicket(t, ticketsDir, archiveTestDoneFile, doneTicketContent(archiveTestDoneID))
+	writeTicket(t, ticketsDir, archiveTestDoneFile2, doneTicketContent(archiveTestDoneID2))
 	// Also add one non-done ticket that should be untouched.
-	writeTicket(t, dir, archiveTestActiveFile, inProgressTicketContent(archiveTestActiveID))
+	writeTicket(t, ticketsDir, archiveTestActiveFile, inProgressTicketContent(archiveTestActiveID))
 
-	stdout, stderr, code := runArchive(t, bin, dir, "y")
+	stdout, stderr, code := runArchive(t, bin, root, "y")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -247,19 +254,18 @@ func TestArchiveBulkConfirmYes(t *testing.T) {
 	}
 
 	// Both done tickets must now be in archive.
-	archiveDir := filepath.Join(dir, "archive")
 	for _, f := range []string{archiveTestDoneFile, archiveTestDoneFile2} {
 		if _, err := os.Stat(filepath.Join(archiveDir, f)); err != nil {
 			t.Errorf("ticket %q not found in archive: %v", f, err)
 		}
 		// Must be gone from active dir.
-		if _, err := os.Stat(filepath.Join(dir, f)); !os.IsNotExist(err) {
+		if _, err := os.Stat(filepath.Join(ticketsDir, f)); !os.IsNotExist(err) {
 			t.Errorf("ticket %q still present in active dir after archiving", f)
 		}
 	}
 
 	// The non-done ticket must remain in active dir.
-	if _, err := os.Stat(filepath.Join(dir, archiveTestActiveFile)); err != nil {
+	if _, err := os.Stat(filepath.Join(ticketsDir, archiveTestActiveFile)); err != nil {
 		t.Errorf("non-done ticket unexpectedly missing from active dir: %v", err)
 	}
 }
@@ -268,17 +274,17 @@ func TestArchiveBulkConfirmYes(t *testing.T) {
 func TestArchiveBulkConfirmUpperY(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, archiveDir := setupWorkDir(t)
 
-	writeTicket(t, dir, archiveTestDoneFile, doneTicketContent(archiveTestDoneID))
+	writeTicket(t, ticketsDir, archiveTestDoneFile, doneTicketContent(archiveTestDoneID))
 
-	stdout, stderr, code := runArchive(t, bin, dir, "Y")
+	stdout, stderr, code := runArchive(t, bin, root, "Y")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
 	}
 
-	archivePath := filepath.Join(dir, "archive", archiveTestDoneFile)
+	archivePath := filepath.Join(archiveDir, archiveTestDoneFile)
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("ticket not found in archive directory: %v", err)
 	}
@@ -289,22 +295,29 @@ func TestArchiveBulkConfirmUpperY(t *testing.T) {
 func TestArchiveBulkConfirmNo(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
 
-	writeTicket(t, dir, archiveTestDoneFile, doneTicketContent(archiveTestDoneID))
+	// Use manual setup so we can verify archive dir was not created by the command.
+	// setupWorkDir pre-creates tickets/archive/, which would defeat the assertion.
+	root := t.TempDir()
+	ticketsDir := filepath.Join(root, "tickets")
+	if err := os.MkdirAll(ticketsDir, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
 
-	stdout, _, code := runArchive(t, bin, dir, "n")
+	writeTicket(t, ticketsDir, archiveTestDoneFile, doneTicketContent(archiveTestDoneID))
+
+	stdout, _, code := runArchive(t, bin, root, "n")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0; stdout=%q", code, stdout)
 	}
 
 	// Ticket must remain in active dir.
-	if _, err := os.Stat(filepath.Join(dir, archiveTestDoneFile)); err != nil {
+	if _, err := os.Stat(filepath.Join(ticketsDir, archiveTestDoneFile)); err != nil {
 		t.Errorf("ticket unexpectedly moved despite 'n' answer: %v", err)
 	}
 	// No archive dir should have been created.
-	if _, err := os.Stat(filepath.Join(dir, "archive")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(ticketsDir, "archive")); !os.IsNotExist(err) {
 		t.Error("archive directory was created despite 'n' answer")
 	}
 }
@@ -314,12 +327,12 @@ func TestArchiveBulkConfirmNo(t *testing.T) {
 func TestArchiveBulkListsFilenames(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, archiveTestDoneFile, doneTicketContent(archiveTestDoneID))
+	writeTicket(t, ticketsDir, archiveTestDoneFile, doneTicketContent(archiveTestDoneID))
 
 	// Use 'n' so we don't actually move anything; we just check the listing.
-	stdout, _, code := runArchive(t, bin, dir, "n")
+	stdout, _, code := runArchive(t, bin, root, "n")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0", code)
@@ -334,11 +347,11 @@ func TestArchiveBulkListsFilenames(t *testing.T) {
 func TestArchiveBulkPromptFormat(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, archiveTestDoneFile, doneTicketContent(archiveTestDoneID))
+	writeTicket(t, ticketsDir, archiveTestDoneFile, doneTicketContent(archiveTestDoneID))
 
-	stdout, _, _ := runArchive(t, bin, dir, "n")
+	stdout, _, _ := runArchive(t, bin, root, "n")
 
 	if !strings.Contains(stdout, "1") {
 		t.Errorf("prompt = %q, want to contain count '1'", stdout)
@@ -352,11 +365,11 @@ func TestArchiveBulkPromptFormat(t *testing.T) {
 func TestArchiveSingleErrorToStderr(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, archiveTestActiveFile, inProgressTicketContent(archiveTestActiveID))
+	writeTicket(t, ticketsDir, archiveTestActiveFile, inProgressTicketContent(archiveTestActiveID))
 
-	stdout, stderr, code := runArchive(t, bin, dir, "", archiveTestActiveID)
+	stdout, stderr, code := runArchive(t, bin, root, "", archiveTestActiveID)
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)

@@ -82,7 +82,7 @@ func runRegister(t *testing.T, bin, workDir, path string) (stdout, stderr string
 func TestRegisterHappyPath(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	// Write the external file outside the tickets dir (a sibling temp dir).
 	srcDir := t.TempDir()
@@ -91,7 +91,7 @@ func TestRegisterHappyPath(t *testing.T) {
 		t.Fatalf("setup: write source file: %v", err)
 	}
 
-	stdout, stderr, code := runRegister(t, bin, dir, srcPath)
+	stdout, stderr, code := runRegister(t, bin, root, srcPath)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -105,8 +105,8 @@ func TestRegisterHappyPath(t *testing.T) {
 		t.Errorf("source file still exists at %s after register", srcPath)
 	}
 
-	// A ticket file must have appeared in the tickets dir (dir itself).
-	entries, err := os.ReadDir(dir)
+	// A ticket file must have appeared in ticketsDir.
+	entries, err := os.ReadDir(ticketsDir)
 	if err != nil {
 		t.Fatalf("read dir: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestRegisterHappyPath(t *testing.T) {
 func TestRegisterOverwritesSystemFields(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "external-ticket.md")
@@ -140,17 +140,17 @@ func TestRegisterOverwritesSystemFields(t *testing.T) {
 		t.Fatalf("setup: write source file: %v", err)
 	}
 
-	_, _, code := runRegister(t, bin, dir, srcPath)
+	_, _, code := runRegister(t, bin, root, srcPath)
 	if code != 0 {
 		t.Fatalf("register failed with exit code %d", code)
 	}
 
 	// Read the written ticket and verify system fields were overwritten.
-	entries, _ := os.ReadDir(dir)
+	entries, _ := os.ReadDir(ticketsDir)
 	var registeredPath string
 	for _, e := range entries {
 		if strings.HasSuffix(e.Name(), ".md") {
-			registeredPath = filepath.Join(dir, e.Name())
+			registeredPath = filepath.Join(ticketsDir, e.Name())
 		}
 	}
 	if registeredPath == "" {
@@ -174,9 +174,9 @@ func TestRegisterOverwritesSystemFields(t *testing.T) {
 func TestRegisterFileNotFound(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	_, stderr, code := runRegister(t, bin, dir, "/nonexistent/path/ticket.md")
+	_, stderr, code := runRegister(t, bin, root, "/nonexistent/path/ticket.md")
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)
@@ -191,7 +191,7 @@ func TestRegisterFileNotFound(t *testing.T) {
 func TestRegisterInvalidYAML(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "bad-ticket.md")
@@ -199,7 +199,7 @@ func TestRegisterInvalidYAML(t *testing.T) {
 		t.Fatalf("setup: write source file: %v", err)
 	}
 
-	_, stderr, code := runRegister(t, bin, dir, srcPath)
+	_, stderr, code := runRegister(t, bin, root, srcPath)
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1; stderr=%q", code, stderr)
@@ -219,7 +219,7 @@ func TestRegisterInvalidYAML(t *testing.T) {
 func TestRegisterLintFailure(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	srcDir := t.TempDir()
 	srcPath := filepath.Join(srcDir, "bad-ticket.md")
@@ -227,7 +227,7 @@ func TestRegisterLintFailure(t *testing.T) {
 		t.Fatalf("setup: write source file: %v", err)
 	}
 
-	_, stderr, code := runRegister(t, bin, dir, srcPath)
+	_, stderr, code := runRegister(t, bin, root, srcPath)
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1; stderr=%q", code, stderr)
@@ -242,7 +242,7 @@ func TestRegisterLintFailure(t *testing.T) {
 	}
 
 	// No ticket must appear in the tickets dir.
-	entries, _ := os.ReadDir(dir)
+	entries, _ := os.ReadDir(ticketsDir)
 	for _, e := range entries {
 		if strings.HasSuffix(e.Name(), ".md") {
 			t.Errorf("ticket file %q appeared in tickets dir despite lint failure", e.Name())
@@ -255,10 +255,10 @@ func TestRegisterLintFailure(t *testing.T) {
 func TestRegisterNoArgument(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
 	cmd := exec.Command(bin, "register")
-	cmd.Dir = dir
+	cmd.Dir = root
 	err := cmd.Run()
 	if err == nil {
 		t.Fatal("expected exit code 1, got 0")
@@ -274,7 +274,7 @@ func TestRegisterNoArgument(t *testing.T) {
 func TestRegisterIdempotentNextID(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	for i, id := range []string{"0001", "0002"} {
 		srcDir := t.TempDir()
@@ -283,13 +283,13 @@ func TestRegisterIdempotentNextID(t *testing.T) {
 			t.Fatalf("setup: write source file: %v", err)
 		}
 
-		stdout, stderr, code := runRegister(t, bin, dir, srcPath)
+		stdout, stderr, code := runRegister(t, bin, root, srcPath)
 		if code != 0 {
 			t.Fatalf("register %d: exit code = %d, want 0; stderr=%q", i, code, stderr)
 		}
 
-		// Verify the file with the expected id prefix exists.
-		entries, _ := os.ReadDir(dir)
+		// Verify the file with the expected id prefix exists in ticketsDir.
+		entries, _ := os.ReadDir(ticketsDir)
 		found := false
 		for _, e := range entries {
 			if strings.HasPrefix(e.Name(), id) {
@@ -298,7 +298,7 @@ func TestRegisterIdempotentNextID(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Errorf("register %d: expected file with prefix %q in dir; stdout=%q; files=%v",
+			t.Errorf("register %d: expected file with prefix %q in tickets dir; stdout=%q; files=%v",
 				i, id, stdout, entries)
 		}
 	}

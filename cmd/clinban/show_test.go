@@ -2,9 +2,7 @@ package main_test
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -91,12 +89,12 @@ func runShow(t *testing.T, bin, workDir string, args ...string) (stdout, stderr 
 func TestShowHappyPath(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	filename := fmt.Sprintf("%s-fix-login-timeout-on-staging.md", showTestID)
-	writeTicket(t, dir, filename, ticketNoTags(showTestID, showTestTitle, showTestType))
+	writeTicket(t, ticketsDir, filename, ticketNoTags(showTestID, showTestTitle, showTestType))
 
-	stdout, stderr, code := runShow(t, bin, dir, showTestID)
+	stdout, stderr, code := runShow(t, bin, root, showTestID)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -129,12 +127,12 @@ func TestShowHappyPath(t *testing.T) {
 func TestShowNoTagsOmitsTagLine(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	filename := fmt.Sprintf("%s-fix-login-timeout-on-staging.md", showTestID)
-	writeTicket(t, dir, filename, ticketNoTags(showTestID, showTestTitle, showTestType))
+	writeTicket(t, ticketsDir, filename, ticketNoTags(showTestID, showTestTitle, showTestType))
 
-	stdout, _, code := runShow(t, bin, dir, showTestID)
+	stdout, _, code := runShow(t, bin, root, showTestID)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q", code, stdout)
@@ -149,13 +147,13 @@ func TestShowNoTagsOmitsTagLine(t *testing.T) {
 func TestShowWithTags(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	tags := []string{showTestTag1, showTestTag2}
 	filename := fmt.Sprintf("%s-fix-login-timeout-on-staging.md", showTestID)
-	writeTicket(t, dir, filename, ticketWithTagsContent(showTestID, showTestTitle, showTestType, tags))
+	writeTicket(t, ticketsDir, filename, ticketWithTagsContent(showTestID, showTestTitle, showTestType, tags))
 
-	stdout, _, code := runShow(t, bin, dir, showTestID)
+	stdout, _, code := runShow(t, bin, root, showTestID)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q", code, stdout)
@@ -179,13 +177,13 @@ func TestShowWithTags(t *testing.T) {
 func TestShowWithBody(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	const body = "This is the ticket body.\n\nIt has multiple paragraphs."
 	filename := fmt.Sprintf("%s-fix-login-timeout-on-staging.md", showTestID)
-	writeTicket(t, dir, filename, ticketWithBodyContent(showTestID, showTestTitle, showTestType, body))
+	writeTicket(t, ticketsDir, filename, ticketWithBodyContent(showTestID, showTestTitle, showTestType, body))
 
-	stdout, _, code := runShow(t, bin, dir, showTestID)
+	stdout, _, code := runShow(t, bin, root, showTestID)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q", code, stdout)
@@ -200,17 +198,12 @@ func TestShowWithBody(t *testing.T) {
 func TestShowArchivedTicket(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
-
-	archiveDir := filepath.Join(dir, "archive")
-	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	root, _, archiveDir := setupWorkDir(t)
 
 	filename := fmt.Sprintf("%s-fix-login-timeout-on-staging.md", showTestID)
 	writeTicket(t, archiveDir, filename, ticketNoTags(showTestID, showTestTitle, showTestType))
 
-	stdout, _, code := runShow(t, bin, dir, showTestID)
+	stdout, _, code := runShow(t, bin, root, showTestID)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q", code, stdout)
@@ -225,12 +218,12 @@ func TestShowArchivedTicket(t *testing.T) {
 func TestShowArchivedTicketNoArchivedLabelForActive(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	filename := fmt.Sprintf("%s-fix-login-timeout-on-staging.md", showTestID)
-	writeTicket(t, dir, filename, ticketNoTags(showTestID, showTestTitle, showTestType))
+	writeTicket(t, ticketsDir, filename, ticketNoTags(showTestID, showTestTitle, showTestType))
 
-	stdout, _, code := runShow(t, bin, dir, showTestID)
+	stdout, _, code := runShow(t, bin, root, showTestID)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q", code, stdout)
@@ -245,10 +238,10 @@ func TestShowArchivedTicketNoArchivedLabelForActive(t *testing.T) {
 func TestShowUnknownID(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
 	// No tickets in the directory.
-	_, stderr, code := runShow(t, bin, dir, "9999")
+	_, stderr, code := runShow(t, bin, root, "9999")
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)
@@ -263,14 +256,14 @@ func TestShowUnknownID(t *testing.T) {
 func TestShowOutputFieldOrder(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	tags := []string{"alpha"}
 	const body = "Some body text."
 	filename := fmt.Sprintf("%s-fix-login-timeout-on-staging.md", showTestID)
-	writeTicket(t, dir, filename, ticketWithBody(showTestID, showTestTitle, showTestType, tags, body))
+	writeTicket(t, ticketsDir, filename, ticketWithBody(showTestID, showTestTitle, showTestType, tags, body))
 
-	stdout, _, code := runShow(t, bin, dir, showTestID)
+	stdout, _, code := runShow(t, bin, root, showTestID)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q", code, stdout)
@@ -324,9 +317,9 @@ func TestShowOutputFieldOrder(t *testing.T) {
 func TestShowNoArgsError(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	_, _, code := runShow(t, bin, dir)
+	_, _, code := runShow(t, bin, root)
 
 	if code == 0 {
 		t.Error("exit code = 0, want non-zero for missing argument")
@@ -337,12 +330,12 @@ func TestShowNoArgsError(t *testing.T) {
 func TestShowTimestampsRFC3339(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	filename := fmt.Sprintf("%s-fix-login-timeout-on-staging.md", showTestID)
-	writeTicket(t, dir, filename, ticketNoTags(showTestID, showTestTitle, showTestType))
+	writeTicket(t, ticketsDir, filename, ticketNoTags(showTestID, showTestTitle, showTestType))
 
-	stdout, _, code := runShow(t, bin, dir, showTestID)
+	stdout, _, code := runShow(t, bin, root, showTestID)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q", code, stdout)

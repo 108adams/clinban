@@ -36,11 +36,12 @@ func TestLoad_AbsentFile(t *testing.T) {
 	if cfg == nil {
 		t.Fatal("expected non-nil Config, got nil")
 	}
-	if cfg.TicketsDir != dir {
-		t.Errorf("TicketsDir: got %q, want %q", cfg.TicketsDir, dir)
+	wantTicketsDir := filepath.Join(dir, "tickets")
+	if cfg.TicketsDir != wantTicketsDir {
+		t.Errorf("TicketsDir: got %q, want %q", cfg.TicketsDir, wantTicketsDir)
 	}
 
-	wantArchive := filepath.Join(dir, "archive")
+	wantArchive := filepath.Join(dir, "tickets", "archive")
 	if cfg.ArchiveDir != wantArchive {
 		t.Errorf("ArchiveDir: got %q, want %q", cfg.ArchiveDir, wantArchive)
 	}
@@ -126,7 +127,7 @@ func TestLoad_PartialConfig_ArchiveDirOnly(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	wantTicketsDir := dir
+	wantTicketsDir := filepath.Join(dir, "tickets")
 	wantArchiveDir := filepath.Join(dir, "custom/archive")
 
 	if cfg.TicketsDir != wantTicketsDir {
@@ -149,11 +150,12 @@ func TestLoad_EmptyTOML(t *testing.T) {
 		t.Fatalf("unexpected error for empty TOML: %v", err)
 	}
 
-	if cfg.TicketsDir != dir {
-		t.Errorf("TicketsDir: got %q, want %q", cfg.TicketsDir, dir)
+	wantTicketsDir := filepath.Join(dir, "tickets")
+	if cfg.TicketsDir != wantTicketsDir {
+		t.Errorf("TicketsDir: got %q, want %q", cfg.TicketsDir, wantTicketsDir)
 	}
 
-	wantArchive := filepath.Join(dir, "archive")
+	wantArchive := filepath.Join(dir, "tickets", "archive")
 	if cfg.ArchiveDir != wantArchive {
 		t.Errorf("ArchiveDir: got %q, want %q", cfg.ArchiveDir, wantArchive)
 	}

@@ -63,11 +63,11 @@ func runMove(t *testing.T, bin, workDir string, args ...string) (stdout, stderr 
 func TestMoveHappyPathInProgressToDone(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, moveTestFile, moveTicketContent(moveTestID, "in-progress"))
+	writeTicket(t, ticketsDir, moveTestFile, moveTicketContent(moveTestID, "in-progress"))
 
-	stdout, stderr, code := runMove(t, bin, dir, moveTestID, "done")
+	stdout, stderr, code := runMove(t, bin, root, moveTestID, "done")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -81,11 +81,11 @@ func TestMoveHappyPathInProgressToDone(t *testing.T) {
 func TestMoveHappyPathBacklogToInProgress(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, moveTestFile, moveTicketContent(moveTestID, "backlog"))
+	writeTicket(t, ticketsDir, moveTestFile, moveTicketContent(moveTestID, "backlog"))
 
-	stdout, stderr, code := runMove(t, bin, dir, moveTestID, "in-progress")
+	stdout, stderr, code := runMove(t, bin, root, moveTestID, "in-progress")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -100,11 +100,11 @@ func TestMoveHappyPathBacklogToInProgress(t *testing.T) {
 func TestMoveSameStatusExitsSilently(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, moveTestFile, moveTicketContent(moveTestID, "in-progress"))
+	writeTicket(t, ticketsDir, moveTestFile, moveTicketContent(moveTestID, "in-progress"))
 
-	stdout, stderr, code := runMove(t, bin, dir, moveTestID, "in-progress")
+	stdout, stderr, code := runMove(t, bin, root, moveTestID, "in-progress")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -123,10 +123,10 @@ func TestMoveSameStatusExitsSilently(t *testing.T) {
 func TestMoveUnknownID(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
 	// No tickets in the directory.
-	_, stderr, code := runMove(t, bin, dir, moveTestUnknownID, "done")
+	_, stderr, code := runMove(t, bin, root, moveTestUnknownID, "done")
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)
@@ -141,11 +141,11 @@ func TestMoveUnknownID(t *testing.T) {
 func TestMoveInvalidStatus(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, moveTestFile, moveTicketContent(moveTestID, "backlog"))
+	writeTicket(t, ticketsDir, moveTestFile, moveTicketContent(moveTestID, "backlog"))
 
-	_, stderr, code := runMove(t, bin, dir, moveTestID, "not-a-status")
+	_, stderr, code := runMove(t, bin, root, moveTestID, "not-a-status")
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)
@@ -166,11 +166,11 @@ func TestMoveInvalidStatus(t *testing.T) {
 func TestMoveForbiddenTransitionBlockedToDone(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, moveTestFile, moveTicketContent(moveTestID, "blocked"))
+	writeTicket(t, ticketsDir, moveTestFile, moveTicketContent(moveTestID, "blocked"))
 
-	_, stderr, code := runMove(t, bin, dir, moveTestID, "done")
+	_, stderr, code := runMove(t, bin, root, moveTestID, "done")
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1; stderr=%q", code, stderr)
@@ -192,11 +192,11 @@ func TestMoveForbiddenTransitionBlockedToDone(t *testing.T) {
 func TestMoveForbiddenTransitionDoneToInProgress(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, moveTestFile, moveTicketContent(moveTestID, "done"))
+	writeTicket(t, ticketsDir, moveTestFile, moveTicketContent(moveTestID, "done"))
 
-	_, stderr, code := runMove(t, bin, dir, moveTestID, "in-progress")
+	_, stderr, code := runMove(t, bin, root, moveTestID, "in-progress")
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1; stderr=%q", code, stderr)
@@ -215,11 +215,11 @@ func TestMoveForbiddenTransitionDoneToInProgress(t *testing.T) {
 func TestMoveUpdatesStatusOnDisk(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	ticketPath := writeTicket(t, dir, moveTestFile, moveTicketContent(moveTestID, "backlog"))
+	ticketPath := writeTicket(t, ticketsDir, moveTestFile, moveTicketContent(moveTestID, "backlog"))
 
-	_, _, code := runMove(t, bin, dir, moveTestID, "in-progress")
+	_, _, code := runMove(t, bin, root, moveTestID, "in-progress")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
@@ -240,7 +240,7 @@ func TestMoveUpdatesStatusOnDisk(t *testing.T) {
 func TestMoveUpdatedTimestampChanges(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	// Create ticket with a known old timestamp.
 	oldTime := "2000-01-01T00:00:00Z"
@@ -255,9 +255,9 @@ created: %s
 updated: %s
 ---
 `, moveTestID, now, oldTime)
-	ticketPath := writeTicket(t, dir, moveTestFile, content)
+	ticketPath := writeTicket(t, ticketsDir, moveTestFile, content)
 
-	_, _, code := runMove(t, bin, dir, moveTestID, "in-progress")
+	_, _, code := runMove(t, bin, root, moveTestID, "in-progress")
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
@@ -277,17 +277,12 @@ updated: %s
 func TestMoveArchivedTicketDoneToBacklog(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, archiveDir := setupWorkDir(t)
 
-	// Set up archive directory with a done ticket.
-	archiveDir := filepath.Join(dir, "archive")
-	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
+	// Write a done ticket in the archive directory.
 	archivePath := writeTicket(t, archiveDir, moveTestFile, moveTicketContent(moveTestID, "done"))
 
-	stdout, stderr, code := runMove(t, bin, dir, moveTestID, "backlog")
+	stdout, stderr, code := runMove(t, bin, root, moveTestID, "backlog")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -302,7 +297,7 @@ func TestMoveArchivedTicketDoneToBacklog(t *testing.T) {
 	}
 
 	// The ticket must now be in the active directory with status backlog.
-	activePath := filepath.Join(dir, moveTestFile)
+	activePath := filepath.Join(ticketsDir, moveTestFile)
 	if _, err := os.Stat(activePath); err != nil {
 		t.Errorf("ticket not found in active directory after reopen: %v", err)
 	}
@@ -327,18 +322,14 @@ func TestMoveArchivedTicketDoneToBacklog(t *testing.T) {
 func TestMoveArchivedTicketNonReopenTransition(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, archiveDir := setupWorkDir(t)
 
-	// Set up archive directory with a ticket in in-progress status (unusual but
-	// possible via direct file edit).
-	archiveDir := filepath.Join(dir, "archive")
-	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	// Write a ticket in in-progress status in the archive (unusual but possible
+	// via direct file edit).
 	archiveFile := filepath.Join(archiveDir, moveTestFile)
 	writeTicket(t, archiveDir, moveTestFile, moveTicketContent(moveTestID, "in-progress"))
 
-	stdout, stderr, code := runMove(t, bin, dir, moveTestID, "done")
+	stdout, stderr, code := runMove(t, bin, root, moveTestID, "done")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -352,7 +343,7 @@ func TestMoveArchivedTicketNonReopenTransition(t *testing.T) {
 		t.Errorf("ticket unexpectedly missing from archive: %v", err)
 	}
 	// Must not exist in active dir.
-	if _, err := os.Stat(filepath.Join(dir, moveTestFile)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(ticketsDir, moveTestFile)); !os.IsNotExist(err) {
 		t.Error("ticket unexpectedly appeared in active directory")
 	}
 }
@@ -379,11 +370,11 @@ func TestMoveAllValidTransitions(t *testing.T) {
 		tc := tc
 		t.Run(tc.from+"->"+tc.to, func(t *testing.T) {
 			t.Parallel()
-			dir := t.TempDir()
+			root, ticketsDir, _ := setupWorkDir(t)
 
-			writeTicket(t, dir, moveTestFile, moveTicketContent(moveTestID, tc.from))
+			writeTicket(t, ticketsDir, moveTestFile, moveTicketContent(moveTestID, tc.from))
 
-			_, stderr, code := runMove(t, bin, dir, moveTestID, tc.to)
+			_, stderr, code := runMove(t, bin, root, moveTestID, tc.to)
 			if code != 0 {
 				t.Errorf("exit code = %d, want 0 for %s→%s; stderr=%q", code, tc.from, tc.to, stderr)
 			}
@@ -422,19 +413,19 @@ func TestMoveAllInvalidTransitions(t *testing.T) {
 
 			// Same-status transitions exit 0 silently, so skip those.
 			if tc.from == tc.to {
-				dir := t.TempDir()
-				writeTicket(t, dir, moveTestFile, moveTicketContent(moveTestID, tc.from))
-				_, _, code := runMove(t, bin, dir, moveTestID, tc.to)
+				root, ticketsDir, _ := setupWorkDir(t)
+				writeTicket(t, ticketsDir, moveTestFile, moveTicketContent(moveTestID, tc.from))
+				_, _, code := runMove(t, bin, root, moveTestID, tc.to)
 				if code != 0 {
 					t.Errorf("self-transition %s→%s: exit code = %d, want 0 (no-op)", tc.from, tc.to, code)
 				}
 				return
 			}
 
-			dir := t.TempDir()
-			writeTicket(t, dir, moveTestFile, moveTicketContent(moveTestID, tc.from))
+			root, ticketsDir, _ := setupWorkDir(t)
+			writeTicket(t, ticketsDir, moveTestFile, moveTicketContent(moveTestID, tc.from))
 
-			_, stderr, code := runMove(t, bin, dir, moveTestID, tc.to)
+			_, stderr, code := runMove(t, bin, root, moveTestID, tc.to)
 			if code != 1 {
 				t.Errorf("exit code = %d, want 1 for forbidden %s→%s; stderr=%q", code, tc.from, tc.to, stderr)
 			}
@@ -450,11 +441,11 @@ func TestMoveAllInvalidTransitions(t *testing.T) {
 func TestMoveErrorToStderr(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, moveTestFile, moveTicketContent(moveTestID, "blocked"))
+	writeTicket(t, ticketsDir, moveTestFile, moveTicketContent(moveTestID, "blocked"))
 
-	stdout, stderr, code := runMove(t, bin, dir, moveTestID, "done")
+	stdout, stderr, code := runMove(t, bin, root, moveTestID, "done")
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)
@@ -472,11 +463,11 @@ func TestMoveErrorToStderr(t *testing.T) {
 func TestMoveConfirmationToStdout(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, moveTestFile, moveTicketContent(moveTestID, "in-progress"))
+	writeTicket(t, ticketsDir, moveTestFile, moveTicketContent(moveTestID, "in-progress"))
 
-	stdout, _, code := runMove(t, bin, dir, moveTestID, "done")
+	stdout, _, code := runMove(t, bin, root, moveTestID, "done")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
@@ -494,9 +485,9 @@ func TestMoveConfirmationToStdout(t *testing.T) {
 func TestMoveNoArgs(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	_, _, code := runMove(t, bin, dir)
+	_, _, code := runMove(t, bin, root)
 
 	if code == 0 {
 		t.Error("exit code = 0, want non-zero for missing arguments")
@@ -507,9 +498,9 @@ func TestMoveNoArgs(t *testing.T) {
 func TestMoveOneArg(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	_, _, code := runMove(t, bin, dir, moveTestID)
+	_, _, code := runMove(t, bin, root, moveTestID)
 
 	if code == 0 {
 		t.Error("exit code = 0, want non-zero for missing status argument")

@@ -48,9 +48,9 @@ func runNew(t *testing.T, bin, workDir string, args ...string) (stdout, stderr s
 func TestNewNoInteractiveHappyPath(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	stdout, stderr, code := runNew(t, bin, dir,
+	stdout, stderr, code := runNew(t, bin, root,
 		"--title", newTestTitle,
 		"--type", newTestType,
 	)
@@ -70,10 +70,10 @@ func TestNewNoInteractiveHappyPath(t *testing.T) {
 		t.Errorf("stdout = %q, want to contain %q", stdout, wantFile)
 	}
 
-	// The ticket file must exist in the working directory.
-	ticketPath := filepath.Join(dir, wantFile)
+	// The ticket file must exist in the tickets directory.
+	ticketPath := filepath.Join(ticketsDir, wantFile)
 	if _, err := os.Stat(ticketPath); os.IsNotExist(err) {
-		t.Errorf("ticket file %q not found in %q", wantFile, dir)
+		t.Errorf("ticket file %q not found in %q", wantFile, ticketsDir)
 	}
 }
 
@@ -82,9 +82,9 @@ func TestNewNoInteractiveHappyPath(t *testing.T) {
 func TestNewNoInteractiveCreatesCorrectContent(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	_, _, code := runNew(t, bin, dir,
+	_, _, code := runNew(t, bin, root,
 		"--title", newTestTitle,
 		"--type", newTestType,
 		"--body", newTestBody,
@@ -96,7 +96,7 @@ func TestNewNoInteractiveCreatesCorrectContent(t *testing.T) {
 	}
 
 	wantFile := fmt.Sprintf("%s-%s.md", newExpectedID, newExpectedSlug)
-	ticketPath := filepath.Join(dir, wantFile)
+	ticketPath := filepath.Join(ticketsDir, wantFile)
 
 	content, err := os.ReadFile(ticketPath)
 	if err != nil {
@@ -129,9 +129,9 @@ func TestNewNoInteractiveCreatesCorrectContent(t *testing.T) {
 func TestNewNoInteractiveMissingTitle(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	stdout, stderr, code := runNew(t, bin, dir, "--type", newTestType)
+	stdout, stderr, code := runNew(t, bin, root, "--type", newTestType)
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1; stdout=%q stderr=%q", code, stdout, stderr)
@@ -146,9 +146,9 @@ func TestNewNoInteractiveMissingTitle(t *testing.T) {
 func TestNewNoInteractiveMissingType(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	stdout, stderr, code := runNew(t, bin, dir, "--title", newTestTitle)
+	stdout, stderr, code := runNew(t, bin, root, "--title", newTestTitle)
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1; stdout=%q stderr=%q", code, stdout, stderr)
@@ -163,10 +163,10 @@ func TestNewNoInteractiveMissingType(t *testing.T) {
 func TestNewNoInteractiveInvalidType(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
 	invalidType := "wishlist"
-	stdout, stderr, code := runNew(t, bin, dir,
+	stdout, stderr, code := runNew(t, bin, root,
 		"--title", newTestTitle,
 		"--type", invalidType,
 	)
@@ -190,8 +190,8 @@ func TestNewNoInteractiveAllTypes(t *testing.T) {
 		tt := tt // capture for parallel subtests
 		t.Run(tt, func(t *testing.T) {
 			t.Parallel()
-			dir := t.TempDir()
-			_, stderr, code := runNew(t, bin, dir,
+			root, _, _ := setupWorkDir(t)
+			_, stderr, code := runNew(t, bin, root,
 				"--title", newTestTitle,
 				"--type", tt,
 			)
@@ -207,12 +207,12 @@ func TestNewNoInteractiveAllTypes(t *testing.T) {
 func TestNewNoInteractiveIDAssignment(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
 	// Pre-populate with ticket 0001.
-	writeTicket(t, dir, "0001-existing-ticket.md", validTicketContent("0001"))
+	writeTicket(t, ticketsDir, "0001-existing-ticket.md", validTicketContent("0001"))
 
-	stdout, stderr, code := runNew(t, bin, dir,
+	stdout, stderr, code := runNew(t, bin, root,
 		"--title", "Next ticket title",
 		"--type", "task",
 	)
@@ -226,7 +226,7 @@ func TestNewNoInteractiveIDAssignment(t *testing.T) {
 	}
 
 	wantFile := "0002-next-ticket-title.md"
-	ticketPath := filepath.Join(dir, wantFile)
+	ticketPath := filepath.Join(ticketsDir, wantFile)
 	if _, err := os.Stat(ticketPath); os.IsNotExist(err) {
 		t.Errorf("expected ticket file %q not found", wantFile)
 	}
@@ -237,9 +237,9 @@ func TestNewNoInteractiveIDAssignment(t *testing.T) {
 func TestNewNoInteractiveWithoutBody(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	_, _, code := runNew(t, bin, dir,
+	_, _, code := runNew(t, bin, root,
 		"--title", newTestTitle,
 		"--type", newTestType,
 	)
@@ -248,7 +248,7 @@ func TestNewNoInteractiveWithoutBody(t *testing.T) {
 	}
 
 	wantFile := fmt.Sprintf("%s-%s.md", newExpectedID, newExpectedSlug)
-	content, err := os.ReadFile(filepath.Join(dir, wantFile))
+	content, err := os.ReadFile(filepath.Join(ticketsDir, wantFile))
 	if err != nil {
 		t.Fatalf("reading ticket: %v", err)
 	}
@@ -264,9 +264,9 @@ func TestNewNoInteractiveWithoutBody(t *testing.T) {
 func TestNewNoInteractiveOutputToStdout(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	stdout, stderr, code := runNew(t, bin, dir,
+	stdout, stderr, code := runNew(t, bin, root,
 		"--title", newTestTitle,
 		"--type", newTestType,
 	)
@@ -287,9 +287,9 @@ func TestNewNoInteractiveOutputToStdout(t *testing.T) {
 func TestNewNoInteractiveTagsParsed(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	_, _, code := runNew(t, bin, dir,
+	_, _, code := runNew(t, bin, root,
 		"--title", newTestTitle,
 		"--type", newTestType,
 		"--tags", "alpha,beta,gamma",
@@ -299,7 +299,7 @@ func TestNewNoInteractiveTagsParsed(t *testing.T) {
 	}
 
 	wantFile := fmt.Sprintf("%s-%s.md", newExpectedID, newExpectedSlug)
-	content, err := os.ReadFile(filepath.Join(dir, wantFile))
+	content, err := os.ReadFile(filepath.Join(ticketsDir, wantFile))
 	if err != nil {
 		t.Fatalf("reading ticket: %v", err)
 	}
@@ -317,9 +317,9 @@ func TestNewNoInteractiveTagsParsed(t *testing.T) {
 func TestNewNoInteractiveStatusIsBacklog(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	_, _, code := runNew(t, bin, dir,
+	_, _, code := runNew(t, bin, root,
 		"--title", newTestTitle,
 		"--type", newTestType,
 	)
@@ -328,7 +328,7 @@ func TestNewNoInteractiveStatusIsBacklog(t *testing.T) {
 	}
 
 	wantFile := fmt.Sprintf("%s-%s.md", newExpectedID, newExpectedSlug)
-	content, err := os.ReadFile(filepath.Join(dir, wantFile))
+	content, err := os.ReadFile(filepath.Join(ticketsDir, wantFile))
 	if err != nil {
 		t.Fatalf("reading ticket: %v", err)
 	}
@@ -342,9 +342,9 @@ func TestNewNoInteractiveStatusIsBacklog(t *testing.T) {
 func TestNewNoInteractiveFourDigitPaddedID(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	_, _, code := runNew(t, bin, dir,
+	_, _, code := runNew(t, bin, root,
 		"--title", newTestTitle,
 		"--type", newTestType,
 	)
@@ -353,7 +353,7 @@ func TestNewNoInteractiveFourDigitPaddedID(t *testing.T) {
 	}
 
 	wantFile := fmt.Sprintf("%s-%s.md", newExpectedID, newExpectedSlug)
-	content, err := os.ReadFile(filepath.Join(dir, wantFile))
+	content, err := os.ReadFile(filepath.Join(ticketsDir, wantFile))
 	if err != nil {
 		t.Fatalf("reading ticket: %v", err)
 	}
@@ -368,9 +368,9 @@ func TestNewNoInteractiveFourDigitPaddedID(t *testing.T) {
 func TestNewNoInteractiveEmptyTitle(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	_, stderr, code := runNew(t, bin, dir,
+	_, stderr, code := runNew(t, bin, root,
 		"--title", "",
 		"--type", newTestType,
 	)
@@ -384,9 +384,9 @@ func TestNewNoInteractiveEmptyTitle(t *testing.T) {
 func TestNewNoInteractiveEmptyType(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	_, stderr, code := runNew(t, bin, dir,
+	_, stderr, code := runNew(t, bin, root,
 		"--title", newTestTitle,
 		"--type", "",
 	)
@@ -400,9 +400,9 @@ func TestNewNoInteractiveEmptyType(t *testing.T) {
 func TestNewNoInteractiveNoTmpFileLeft(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	_, _, code := runNew(t, bin, dir,
+	_, _, code := runNew(t, bin, root,
 		"--title", newTestTitle,
 		"--type", newTestType,
 	)
@@ -410,7 +410,7 @@ func TestNewNoInteractiveNoTmpFileLeft(t *testing.T) {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
 
-	entries, err := os.ReadDir(dir)
+	entries, err := os.ReadDir(ticketsDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -510,12 +510,12 @@ func runNewInteractive(t *testing.T, bin, workDir, editor, stdin string) (stdout
 func TestNewInteractiveHappyPath(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 	scriptDir := t.TempDir()
 
 	editor := makeEditorScript(t, scriptDir, interactiveTestTitle, interactiveTestType)
 
-	stdout, stderr, code := runNewInteractive(t, bin, dir, editor, "")
+	stdout, stderr, code := runNewInteractive(t, bin, root, editor, "")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -529,9 +529,9 @@ func TestNewInteractiveHappyPath(t *testing.T) {
 		t.Errorf("stdout = %q, want to contain %q", stdout, wantFile)
 	}
 
-	ticketPath := filepath.Join(dir, wantFile)
+	ticketPath := filepath.Join(ticketsDir, wantFile)
 	if _, err := os.Stat(ticketPath); os.IsNotExist(err) {
-		t.Fatalf("ticket file %q not found in %q", wantFile, dir)
+		t.Fatalf("ticket file %q not found in %q", wantFile, ticketsDir)
 	}
 
 	content, err := os.ReadFile(ticketPath)
@@ -561,12 +561,12 @@ func TestNewInteractiveHappyPath(t *testing.T) {
 func TestNewInteractiveDiscard(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 	scriptDir := t.TempDir()
 
 	editor := makeDiscardEditorScript(t, scriptDir)
 
-	stdout, stderr, code := runNewInteractive(t, bin, dir, editor, "")
+	stdout, stderr, code := runNewInteractive(t, bin, root, editor, "")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -576,8 +576,8 @@ func TestNewInteractiveDiscard(t *testing.T) {
 		t.Errorf("expected 'discarded' in output; stdout=%q stderr=%q", stdout, stderr)
 	}
 
-	// No ticket files should exist.
-	entries, err := os.ReadDir(dir)
+	// No ticket files should exist in ticketsDir.
+	entries, err := os.ReadDir(ticketsDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -595,14 +595,14 @@ func TestNewInteractiveDiscard(t *testing.T) {
 func TestNewInteractiveLintErrorPromptsReopen(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 	scriptDir := t.TempDir()
 
 	// Editor sets a title but leaves type as "" — will produce a lint error.
 	editor := makeLintErrorEditorScript(t, scriptDir, interactiveTestTitle)
 
 	// User declines re-open with "n".
-	stdout, stderr, code := runNewInteractive(t, bin, dir, editor, "n\n")
+	stdout, stderr, code := runNewInteractive(t, bin, root, editor, "n\n")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -619,8 +619,8 @@ func TestNewInteractiveLintErrorPromptsReopen(t *testing.T) {
 		t.Errorf("expected re-open prompt; stdout=%q stderr=%q", stdout, stderr)
 	}
 
-	// The ticket file must still exist (written regardless of lint).
-	entries, err := os.ReadDir(dir)
+	// The ticket file must still exist in ticketsDir (written regardless of lint).
+	entries, err := os.ReadDir(ticketsDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -640,17 +640,17 @@ func TestNewInteractiveLintErrorPromptsReopen(t *testing.T) {
 func TestNewInteractiveStatusIsBacklog(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 	scriptDir := t.TempDir()
 
 	editor := makeEditorScript(t, scriptDir, interactiveTestTitle, interactiveTestType)
-	_, _, code := runNewInteractive(t, bin, dir, editor, "")
+	_, _, code := runNewInteractive(t, bin, root, editor, "")
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
 
 	wantFile := fmt.Sprintf("%s-%s.md", interactiveTestID, interactiveTestSlug)
-	content, err := os.ReadFile(filepath.Join(dir, wantFile))
+	content, err := os.ReadFile(filepath.Join(ticketsDir, wantFile))
 	if err != nil {
 		t.Fatalf("reading ticket: %v", err)
 	}
@@ -664,16 +664,16 @@ func TestNewInteractiveStatusIsBacklog(t *testing.T) {
 func TestNewInteractiveNoTmpFileLeft(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 	scriptDir := t.TempDir()
 
 	editor := makeEditorScript(t, scriptDir, interactiveTestTitle, interactiveTestType)
-	_, _, code := runNewInteractive(t, bin, dir, editor, "")
+	_, _, code := runNewInteractive(t, bin, root, editor, "")
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
 
-	entries, err := os.ReadDir(dir)
+	entries, err := os.ReadDir(ticketsDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -689,14 +689,14 @@ func TestNewInteractiveNoTmpFileLeft(t *testing.T) {
 func TestNewInteractiveIDAssignment(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 	scriptDir := t.TempDir()
 
 	// Pre-populate with ticket 0001.
-	writeTicket(t, dir, "0001-existing-ticket.md", validTicketContent("0001"))
+	writeTicket(t, ticketsDir, "0001-existing-ticket.md", validTicketContent("0001"))
 
 	editor := makeEditorScript(t, scriptDir, interactiveTestTitle, interactiveTestType)
-	stdout, stderr, code := runNewInteractive(t, bin, dir, editor, "")
+	stdout, stderr, code := runNewInteractive(t, bin, root, editor, "")
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
 	}
@@ -706,7 +706,7 @@ func TestNewInteractiveIDAssignment(t *testing.T) {
 	}
 
 	wantFile := fmt.Sprintf("0002-%s.md", interactiveTestSlug)
-	if _, err := os.Stat(filepath.Join(dir, wantFile)); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(ticketsDir, wantFile)); os.IsNotExist(err) {
 		t.Errorf("expected ticket file %q not found", wantFile)
 	}
 }

@@ -1,4 +1,4 @@
-package main
+package main_test
 
 import (
 	"os"
@@ -7,18 +7,6 @@ import (
 	"strings"
 	"testing"
 )
-
-func buildEditBinary(t *testing.T) string {
-	t.Helper()
-	bin := filepath.Join(t.TempDir(), "clinban-edit-test")
-	cmd := exec.Command("go", "build", "-o", bin, "./cmd/clinban/")
-	cmd.Dir = "/home/adam/src/go-trello"
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("build failed: %v\n%s", err, out)
-	}
-	return bin
-}
 
 func runEditCmd(t *testing.T, bin, dir string, env map[string]string, stdin string, args ...string) (stdout, stderr string, exitCode int) {
 	t.Helper()
@@ -46,9 +34,9 @@ func runEditCmd(t *testing.T, bin, dir string, env map[string]string, stdin stri
 	return outBuf.String(), errBuf.String(), exitCode
 }
 
-func createTicketForEdit(t *testing.T, bin, dir string) {
+func createTicketForEdit(t *testing.T, bin, root string) {
 	t.Helper()
-	_, errStr, code := runEditCmd(t, bin, dir, nil, "", "new", "--no-interactive", "--title", "Test ticket for edit", "--type", "task")
+	_, errStr, code := runEditCmd(t, bin, root, nil, "", "new", "--no-interactive", "--title", "Test ticket for edit", "--type", "task")
 	if code != 0 {
 		t.Fatalf("setup: create ticket failed: %s", errStr)
 	}
@@ -56,10 +44,10 @@ func createTicketForEdit(t *testing.T, bin, dir string) {
 
 func TestEditUnknownID(t *testing.T) {
 	t.Parallel()
-	bin := buildEditBinary(t)
-	dir := t.TempDir()
+	bin := buildBinary(t)
+	root, _, _ := setupWorkDir(t)
 
-	_, stderr, code := runEditCmd(t, bin, dir, nil, "", "edit", "9999")
+	_, stderr, code := runEditCmd(t, bin, root, nil, "", "edit", "9999")
 	if code == 0 {
 		t.Fatal("expected exit 1 for unknown ID")
 	}
@@ -70,22 +58,22 @@ func TestEditUnknownID(t *testing.T) {
 
 func TestEditHappyPath(t *testing.T) {
 	t.Parallel()
-	bin := buildEditBinary(t)
-	dir := t.TempDir()
-	createTicketForEdit(t, bin, dir)
+	bin := buildBinary(t)
+	root, ticketsDir, _ := setupWorkDir(t)
+	createTicketForEdit(t, bin, root)
 
-	editorScript := filepath.Join(dir, "editor.sh")
+	editorScript := filepath.Join(root, "editor.sh")
 	script := "#!/bin/sh\nsed -i 's/title: Test ticket for edit/title: Updated title/' \"$1\"\n"
 	if err := os.WriteFile(editorScript, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	_, stderr, code := runEditCmd(t, bin, dir, map[string]string{"EDITOR": editorScript}, "", "edit", "0001")
+	_, stderr, code := runEditCmd(t, bin, root, map[string]string{"EDITOR": editorScript}, "", "edit", "0001")
 	if code != 0 {
 		t.Fatalf("expected exit 0, got %d; stderr: %s", code, stderr)
 	}
 
-	files, _ := filepath.Glob(filepath.Join(dir, "0001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(ticketsDir, "0001-*.md"))
 	if len(files) == 0 {
 		t.Fatal("ticket file not found after edit")
 	}
@@ -97,23 +85,23 @@ func TestEditHappyPath(t *testing.T) {
 
 func TestEditUpdatesTimestamp(t *testing.T) {
 	t.Parallel()
-	bin := buildEditBinary(t)
-	dir := t.TempDir()
-	createTicketForEdit(t, bin, dir)
+	bin := buildBinary(t)
+	root, ticketsDir, _ := setupWorkDir(t)
+	createTicketForEdit(t, bin, root)
 
 	// Capture original updated timestamp.
-	files, _ := filepath.Glob(filepath.Join(dir, "0001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(ticketsDir, "0001-*.md"))
 	raw, _ := os.ReadFile(files[0])
 	original := string(raw)
 
-	editorScript := filepath.Join(dir, "editor.sh")
+	editorScript := filepath.Join(root, "editor.sh")
 	// Change the title so lint passes and updated is refreshed.
 	script := "#!/bin/sh\nsed -i 's/title: Test ticket for edit/title: Edited title/' \"$1\"\n"
 	if err := os.WriteFile(editorScript, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	_, _, code := runEditCmd(t, bin, dir, map[string]string{"EDITOR": editorScript}, "", "edit", "0001")
+	_, _, code := runEditCmd(t, bin, root, map[string]string{"EDITOR": editorScript}, "", "edit", "0001")
 	if code != 0 {
 		t.Fatal("expected exit 0")
 	}
@@ -127,19 +115,19 @@ func TestEditUpdatesTimestamp(t *testing.T) {
 
 func TestEditLintErrorNoReopen(t *testing.T) {
 	t.Parallel()
-	bin := buildEditBinary(t)
-	dir := t.TempDir()
-	createTicketForEdit(t, bin, dir)
+	bin := buildBinary(t)
+	root, _, _ := setupWorkDir(t)
+	createTicketForEdit(t, bin, root)
 
 	// Editor sets type to an invalid value (lint failure).
-	editorScript := filepath.Join(dir, "editor.sh")
+	editorScript := filepath.Join(root, "editor.sh")
 	script := "#!/bin/sh\nsed -i 's/type: task/type: invalid/' \"$1\"\n"
 	if err := os.WriteFile(editorScript, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
 	// Send "n" to decline reopen.
-	_, stderr, code := runEditCmd(t, bin, dir, map[string]string{"EDITOR": editorScript}, "n\n", "edit", "0001")
+	_, stderr, code := runEditCmd(t, bin, root, map[string]string{"EDITOR": editorScript}, "n\n", "edit", "0001")
 	if code == 0 {
 		t.Fatal("expected exit 1 on lint failure")
 	}
@@ -150,13 +138,13 @@ func TestEditLintErrorNoReopen(t *testing.T) {
 
 func TestEditLintPassAfterReopen(t *testing.T) {
 	t.Parallel()
-	bin := buildEditBinary(t)
-	dir := t.TempDir()
-	createTicketForEdit(t, bin, dir)
+	bin := buildBinary(t)
+	root, _, _ := setupWorkDir(t)
+	createTicketForEdit(t, bin, root)
 
 	// First editor call breaks the type; second fixes it.
-	callCount := filepath.Join(dir, "calls")
-	editorScript := filepath.Join(dir, "editor.sh")
+	callCount := filepath.Join(root, "calls")
+	editorScript := filepath.Join(root, "editor.sh")
 	script := `#!/bin/sh
 if [ ! -f ` + callCount + ` ]; then
   touch ` + callCount + `
@@ -170,7 +158,7 @@ fi
 	}
 
 	// Send "y" to reopen after lint error.
-	_, stderr, code := runEditCmd(t, bin, dir, map[string]string{"EDITOR": editorScript}, "y\n", "edit", "0001")
+	_, stderr, code := runEditCmd(t, bin, root, map[string]string{"EDITOR": editorScript}, "y\n", "edit", "0001")
 	if code != 0 {
 		t.Fatalf("expected exit 0 after successful reopen, got %d; stderr: %s", code, stderr)
 	}

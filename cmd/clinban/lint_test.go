@@ -85,6 +85,24 @@ func projectRoot(t *testing.T) string {
 	}
 }
 
+// setupWorkDir creates a temp directory tree matching the default layout:
+//
+//	root/
+//	  tickets/
+//	    archive/
+//
+// It returns all three paths, all of which are guaranteed to exist on disk.
+func setupWorkDir(t *testing.T) (root, ticketsDir, archiveDir string) {
+	t.Helper()
+	root = t.TempDir()
+	ticketsDir = filepath.Join(root, "tickets")
+	archiveDir = filepath.Join(ticketsDir, "archive")
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+		t.Fatalf("setupWorkDir: %v", err)
+	}
+	return root, ticketsDir, archiveDir
+}
+
 // writeTicket writes content to <dir>/<filename>.
 func writeTicket(t *testing.T, dir, filename, content string) string {
 	t.Helper()
@@ -123,12 +141,12 @@ func runLint(t *testing.T, bin, workDir string, args ...string) (stdout, stderr 
 func TestLintAllValid(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, "0001-fix-login-timeout.md", validTicketContent("0001"))
-	writeTicket(t, dir, "0002-another-ticket.md", validTicketContent("0002"))
+	writeTicket(t, ticketsDir, "0001-fix-login-timeout.md", validTicketContent("0001"))
+	writeTicket(t, ticketsDir, "0002-another-ticket.md", validTicketContent("0002"))
 
-	stdout, stderr, code := runLint(t, bin, dir)
+	stdout, stderr, code := runLint(t, bin, root)
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -146,11 +164,11 @@ func TestLintAllValid(t *testing.T) {
 func TestLintAllMissingType(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, "0001-fix-login-timeout.md", missingTypeTicketContent("0001"))
+	writeTicket(t, ticketsDir, "0001-fix-login-timeout.md", missingTypeTicketContent("0001"))
 
-	stdout, _, code := runLint(t, bin, dir)
+	stdout, _, code := runLint(t, bin, root)
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)
@@ -170,19 +188,15 @@ func TestLintAllMissingType(t *testing.T) {
 func TestLintAllDuplicateID(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, archiveDir := setupWorkDir(t)
 
 	// Put a ticket with id=0001 in the active directory.
-	writeTicket(t, dir, "0001-fix-login-timeout.md", validTicketContent("0001"))
+	writeTicket(t, ticketsDir, "0001-fix-login-timeout.md", validTicketContent("0001"))
 
 	// Put another ticket with id=0001 (and matching filename prefix) in archive.
-	archiveDir := filepath.Join(dir, "archive")
-	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
 	writeTicket(t, archiveDir, "0001-old-ticket.md", validTicketContent("0001"))
 
-	stdout, _, code := runLint(t, bin, dir)
+	stdout, _, code := runLint(t, bin, root)
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1; stdout=%q", code, stdout)
@@ -199,11 +213,11 @@ func TestLintAllDuplicateID(t *testing.T) {
 func TestLintSingleValid(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, "0001-fix-login-timeout.md", validTicketContent("0001"))
+	writeTicket(t, ticketsDir, "0001-fix-login-timeout.md", validTicketContent("0001"))
 
-	stdout, stderr, code := runLint(t, bin, dir, "0001")
+	stdout, stderr, code := runLint(t, bin, root, "0001")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -218,11 +232,11 @@ func TestLintSingleValid(t *testing.T) {
 func TestLintSingleMissingType(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, "0001-fix-login-timeout.md", missingTypeTicketContent("0001"))
+	writeTicket(t, ticketsDir, "0001-fix-login-timeout.md", missingTypeTicketContent("0001"))
 
-	stdout, _, code := runLint(t, bin, dir, "0001")
+	stdout, _, code := runLint(t, bin, root, "0001")
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)
@@ -237,10 +251,10 @@ func TestLintSingleMissingType(t *testing.T) {
 func TestLintSingleUnknownID(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	// No ticket files in dir.
-	_, stderr, code := runLint(t, bin, dir, "9999")
+	// No ticket files in tickets dir.
+	_, stderr, code := runLint(t, bin, root, "9999")
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)
@@ -255,16 +269,12 @@ func TestLintSingleUnknownID(t *testing.T) {
 func TestLintIncludesArchive(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, archiveDir := setupWorkDir(t)
 
-	// Create archive dir and put a bad ticket in it.
-	archiveDir := filepath.Join(dir, "archive")
-	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	// Put a bad ticket in the archive dir.
 	writeTicket(t, archiveDir, "0001-fix-login-timeout.md", missingTypeTicketContent("0001"))
 
-	stdout, _, code := runLint(t, bin, dir)
+	stdout, _, code := runLint(t, bin, root)
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1; stdout=%q", code, stdout)
@@ -279,9 +289,9 @@ func TestLintIncludesArchive(t *testing.T) {
 func TestLintNoTickets(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, _, _ := setupWorkDir(t)
 
-	stdout, stderr, code := runLint(t, bin, dir)
+	stdout, stderr, code := runLint(t, bin, root)
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
@@ -296,11 +306,11 @@ func TestLintNoTickets(t *testing.T) {
 func TestLintOutputToStdout(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
-	dir := t.TempDir()
+	root, ticketsDir, _ := setupWorkDir(t)
 
-	writeTicket(t, dir, "0001-fix-login-timeout.md", missingTypeTicketContent("0001"))
+	writeTicket(t, ticketsDir, "0001-fix-login-timeout.md", missingTypeTicketContent("0001"))
 
-	stdout, stderr, code := runLint(t, bin, dir)
+	stdout, stderr, code := runLint(t, bin, root)
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)

@@ -31,8 +31,8 @@ type Config struct {
 // Partial configs are valid: omitted fields fall back to defaults. Relative
 // paths are resolved against projectRoot.
 //
-// The default layout uses projectRoot for active tickets and
-// projectRoot/archive for archived tickets.
+// The default layout uses projectRoot/tickets for active tickets and
+// projectRoot/tickets/archive for archived tickets.
 func Load(projectRoot string) (*Config, error) {
 	configPath := filepath.Join(projectRoot, ".clinban")
 
@@ -72,8 +72,8 @@ func Load(projectRoot string) (*Config, error) {
 // defaults returns a Config with all fields set to their default values.
 func defaults(projectRoot string) *Config {
 	return &Config{
-		TicketsDir: projectRoot,
-		ArchiveDir: filepath.Join(projectRoot, "archive"),
+		TicketsDir: filepath.Join(projectRoot, "tickets"),
+		ArchiveDir: filepath.Join(projectRoot, "tickets", "archive"),
 	}
 }
 
