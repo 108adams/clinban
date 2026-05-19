@@ -2,7 +2,7 @@
 
 ## Existing Components (verified)
 
-None. Project is greenfield. Only pipeline documents exist at time of writing.
+All components implemented. Project is feature-complete as of the initial build.
 
 ---
 
@@ -141,7 +141,7 @@ must not import `internal/store`. This constraint applies to all packages added 
 
 **Status:** `accepted`
 **Decision:** All ticket file writes use write-to-temp-file-then-rename, with the temp file
-created in the same directory as the final target path.
+created via `os.CreateTemp` in the same directory as the final target path.
 **Context:** Clinban is the single source of truth for task state in the repository. A partial
 write (due to crash or interrupt) would silently corrupt a ticket visible to git and other
 processes. Automata may access the ticket directory concurrently with Clinban writes.
@@ -150,16 +150,19 @@ processes. Automata may access the ticket directory concurrently with Clinban wr
 |---|---|
 | Direct `os.WriteFile` to target path | Not atomic; interrupted write leaves a corrupt file visible to all readers |
 | Write to system /tmp then rename to target | Cross-device rename is not atomic on POSIX; /tmp is frequently on a different filesystem than the project |
+| `path + ".tmp"` as temp name | Predictable name; vulnerable to pre-created symlink attacks in the ticket directory |
 
 **Rationale:** `os.Rename` on the same filesystem is guaranteed atomic by the POSIX specification.
 Writing the temp file in the same directory as the target ensures the rename is always
-same-filesystem. This is the canonical safe-write pattern for Unix file-based storage.
+same-filesystem. Using `os.CreateTemp` with a random suffix prevents symlink attacks on the
+temp path. This is the canonical safe-write pattern for Unix file-based storage.
 **Consequences:**
 - `+` No partial writes are ever visible in the ticket directory or to git
+- `+` Unpredictable temp name prevents symlink pre-positioning attacks
 - `-` The same-filesystem constraint means temp files must never be created in /tmp
-- `!` If the process crashes between the write and the rename, a temp file is left in the
+- `!` If the process crashes between the write and the rename, a `.clinban-*.tmp` file is left in the
   ticket directory; cleanup strategy deferred to v2
-**Locks:** `internal/store` must use temp-then-rename for every ticket file write.
+**Locks:** `internal/store` must use `os.CreateTemp` + rename for every ticket file write.
 Direct `os.WriteFile` to a final ticket path is forbidden.
 
 ---

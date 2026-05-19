@@ -163,11 +163,12 @@ Tasks 2–8 are independent of each other and may be worked in parallel after Ta
 **Implementation notes:**
 - `NextID`: read all filenames in both dirs matching `[0-9]{4}-*.md`; parse numeric prefix; return max+1. Return 1 if no matches.
 - `FindByID`: match files where the numeric prefix equals the given ID string. TicketsDir first, then ArchiveDir. Return `ErrNotFound` if absent.
-- `WriteTicket`: call `ticket.Marshal`, write to `path + ".tmp"` in the same directory, `os.Rename` to final path. Does **not** set `t.Updated`; the caller sets it before calling `WriteTicket`.
-- `MoveToArchive`: `os.MkdirAll(ArchiveDir)` then `os.Rename`.
-- `MoveToActive`: `os.Rename` from ArchiveDir into TicketsDir. Used only for archive-to-active transitions (e.g. `done → backlog` reopen); **not** for adopting external files.
-- `ListActive`: read all `*.md` files in TicketsDir, parse each, return `[]Record`.
-- `ListArchive`: read all `*.md` files in ArchiveDir, parse each, return `[]Record`.
+- `WriteTicket`: call `ticket.Marshal`, create temp via `os.CreateTemp(filepath.Dir(path), ".clinban-*.tmp")`, write/chmod(0600)/close, `os.Rename` to final path. Does **not** set `t.Updated`; the caller sets it before calling `WriteTicket`.
+- `MoveToArchive`: `os.MkdirAll(ArchiveDir)`, check destination does not exist (return error if it does), then `os.Rename`.
+- `MoveToActive`: check destination does not exist (return error if it does), then `os.Rename`. Used only for archive-to-active transitions (e.g. `done → backlog` reopen); **not** for adopting external files.
+- `ActivePath`: returns `filepath.Join(TicketsDir, filepath.Base(archivePath))` — the TicketsDir path for a file currently in ArchiveDir.
+- `ListActive`: read all files in TicketsDir matching `[0-9]{4}-*.md` (idPattern), parse each, return `[]Record`. Non-matching .md files (e.g. README.md) are silently skipped.
+- `ListArchive`: read all files in ArchiveDir matching `[0-9]{4}-*.md` (idPattern), parse each, return `[]Record`.
 - `AllIDs`: collect numeric prefix from all `*.md` files in both directories.
 - Define `type Record struct { Ticket *ticket.Ticket; Path string; InArchive bool }` in `store.go`.
 - Define `var ErrNotFound = errors.New("ticket not found")` in `store.go`.
@@ -198,11 +199,12 @@ Task 9 must complete before Tasks 10–17. Tasks 10–17 are independent of each
 
 **Implementation notes:**
 - `main.go`: call `root.Execute()`, exit 1 on error.
-- `root.go`: define `rootCmd`; add `PersistentPreRun` that:
+- `root.go`: define `rootCmd` with `SilenceErrors: true` and `SilenceUsage: true`; add `PersistentPreRun` that:
   - Finds project root (walk up from cwd looking for `.clinban`; fall back to cwd).
   - Calls `config.Load(projectRoot)`.
   - Constructs `store.New(cfg)` and stores it on a package-level variable accessible to subcommands.
 - All subcommand files register themselves via `init()` calling `rootCmd.AddCommand(...)`.
+- Error handling convention: command handlers print a user-facing message to stderr and call `os.Exit(1)` for expected errors (not found, validation failures). They return `error` only for unexpected failures so `main` can surface them without double-printing.
 
 **Done when:** `go run ./cmd/clinban --help` prints usage without error.
 
@@ -282,9 +284,9 @@ Task 9 must complete before Tasks 10–17. Tasks 10–17 are independent of each
 - Parse target status; invalid value → print valid status list + exit 1.
 - If current == target: exit 0 silently.
 - `fsm.ValidateTransition(current, target)`; invalid → print error with valid next statuses + exit 1.
-- Update `Status`, call `store.WriteTicket`.
+- Update `Status` and `Updated`, call `store.WriteTicket`.
 - Print `"<id> moved to <status>"`, exit 0.
-- Special case: `done → backlog` calls `store.MoveToActive` if ticket is in archive, then updates status.
+- Special case: `done → backlog` when ticket is in archive — write the updated ticket (status=backlog) to `store.ActivePath(archivePath)` first, then `os.Remove(archivePath)`. This ensures the file is not removed from the archive until the write to the active directory succeeds.
 
 **Done when:** Acceptance criteria §7 move from `01_requirements.md` are met.
 
@@ -395,11 +397,12 @@ Task 9 must complete before Tasks 10–17. Tasks 10–17 are independent of each
 
 **Behaviour:**
 - Resolve ticket by ID (search active + archive); unknown → `"ticket not found"` + exit 1.
-- `editor.Open(path)` (opens the live ticket file directly).
+- Copy the live ticket file to a temp file via `os.CreateTemp` in the same directory (`.clinban-edit-*.md`). Open the **temp copy** in `$EDITOR`, not the live file.
 - On editor close:
-  - Re-read file; `ticket.Parse()`. If parse error: print error; prompt `"Re-open in editor? [y/N] "`; if `y` repeat from `editor.Open`; if `n` exit 1.
-  - `store.AllIDs()`, `lint.Lint(t, filename, allIDs)`. If errors: print each; prompt `"Re-open in editor? [y/N] "`; if `y` repeat from `editor.Open`; if `n` exit 1.
-  - `t.Updated = time.Now()`; `store.WriteTicket(t, path)`.
+  - Read temp; `ticket.Parse()`. If parse error: print error; prompt `"Re-open in editor? [y/N] "`; if `y` repeat from `editor.Open(tmpPath)`; if `n` delete temp, exit 1.
+  - `store.AllIDs()`, `lint.Lint(t, filename, allIDs)`. If errors: print each; prompt `"Re-open in editor? [y/N] "`; if `y` repeat from `editor.Open(tmpPath)`; if `n` delete temp, exit 1.
+  - `t.Updated = time.Now()`; `store.WriteTicket(t, livePath)` — atomically replaces the original only when both parse and lint pass.
+- The temp file is cleaned up via `defer os.Remove(tmpPath)`. The original live file is never modified unless the edit succeeds.
 - Exit 0.
 
 **Integration test:** Set `EDITOR` to a script that modifies the title field; assert `updated` timestamp changes and `clinban lint <id>` passes afterward.

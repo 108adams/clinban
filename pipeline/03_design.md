@@ -225,10 +225,12 @@ type Record struct {
 }
 
 // ListActive returns all tickets in TicketsDir as Records.
+// Only files matching [0-9]{4}-*.md are parsed; other .md files are skipped.
 // Returns an empty slice (never nil) if the directory is empty.
 func (s *Store) ListActive() ([]Record, error)
 
 // ListArchive returns all tickets in ArchiveDir as Records.
+// Only files matching [0-9]{4}-*.md are parsed; other .md files are skipped.
 // Returns an empty slice (never nil) if the directory is empty.
 func (s *Store) ListArchive() ([]Record, error)
 
@@ -236,19 +238,27 @@ func (s *Store) ListArchive() ([]Record, error)
 func (s *Store) ReadTicket(path string) (*ticket.Ticket, error)
 
 // WriteTicket serialises t and writes it atomically to path.
-// Atomic: writes to a temp file in the same directory, then renames.
+// Atomic: creates a temp file via os.CreateTemp in the same directory,
+// writes, sets permissions to 0600, closes, then renames.
 // Does not modify any fields on t; caller must set t.Updated before calling.
 func (s *Store) WriteTicket(t *ticket.Ticket, path string) error
 
 // TicketPath returns the canonical path for a ticket in TicketsDir.
+// Format: <TicketsDir>/<id-zero-padded-4>-<slug>.md
 func (s *Store) TicketPath(id int, slug string) string
+
+// ActivePath returns the path a ticket would have in TicketsDir,
+// preserving its existing filename. Used when moving a ticket back from archive.
+func (s *Store) ActivePath(archivePath string) string
 
 // MoveToArchive moves the file at path into ArchiveDir.
 // Creates ArchiveDir if it does not exist.
+// Returns an error if a file with the same name already exists in ArchiveDir.
 // Returns the new path.
 func (s *Store) MoveToArchive(path string) (string, error)
 
 // MoveToActive moves the file at path from ArchiveDir into TicketsDir.
+// Returns an error if a file with the same name already exists in TicketsDir.
 // Returns the new path.
 func (s *Store) MoveToActive(path string) (string, error)
 
@@ -289,6 +299,11 @@ updated: "{{.Updated}}"
 - Exit code 0 on success, 1 on any error.
 - `root.go` resolves the project root (directory containing `.clinban`, or cwd if absent),
   loads config, and stores `*store.Store` on cobra's context for all subcommands.
+- `rootCmd` sets `SilenceErrors: true` and `SilenceUsage: true`. All error output is
+  owned by the command handler or by `main`; Cobra never prints errors directly.
+- Command handlers call `os.Exit(1)` directly after printing a user-facing error message.
+  They return an `error` only for unexpected failures (I/O errors, etc.) that `main` should
+  surface. This keeps the two paths distinct and prevents double-printing.
 - Interactive prompts (`y/N`) read from `os.Stdin`; default on bare Enter is `N`.
 
 ---
@@ -315,7 +330,7 @@ updated: "{{.Updated}}"
 
 | Package | What to test |
 |---|---|
-| `store` | NextID with 0, 1, N tickets; FindByID in active and archive; WriteTicket atomic (verify temp file gone); MoveToArchive creates dir if absent |
+| `store` | NextID with 0, 1, N tickets; FindByID in active and archive; WriteTicket atomic (verify temp file gone); MoveToArchive creates dir if absent; MoveToArchive and MoveToActive return error if destination exists; ListActive skips non-ticket .md files |
 | CLI | Happy path smoke test for each command using `--no-interactive` or scripted `$EDITOR` |
 
 ### Not unit-tested
