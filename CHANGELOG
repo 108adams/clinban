@@ -1,0 +1,53 @@
+Clinban — Development Changelog
+
+This is a glimpse of how the project grew, not a mechanical commit list.
+
+────────────────────────────────────────────────────────────────────────────────
+2026-05-19  Project initialization command
+
+  clinban init creates the ticket directory, archive directory, and .clinban
+  config file in one step. Supports --force for repairing partial setups.
+  Default ticket layout moved from project root to tickets/ subdirectory.
+
+────────────────────────────────────────────────────────────────────────────────
+2026-05-19  Editor integration and interactive ticket creation
+
+  clinban new opens $EDITOR with a pre-populated template. After the editor
+  closes, the ticket is linted and the user can reopen to fix errors.
+  clinban edit follows the same loop — edits go through a temp copy and
+  replace the live file only after parse and lint both pass.
+
+────────────────────────────────────────────────────────────────────────────────
+2026-05-19  Data integrity hardening
+
+  Six issues found in review: path containment check in register to prevent
+  traversal, atomic write ordering, stricter ID uniqueness enforcement,
+  consistent error wrapping, tightened lint rules, and FSM transition coverage.
+
+────────────────────────────────────────────────────────────────────────────────
+2026-05-19  Full CLI surface
+
+  All core commands landed: new --no-interactive, list (filtered, sorted),
+  show, move (FSM-enforced transitions), archive (single and bulk with
+  confirmation), register (adopt external files), lint (single or all),
+  and shell completion via Cobra.
+
+────────────────────────────────────────────────────────────────────────────────
+2026-05-18  Internal packages
+
+  Foundation packages built independently and in dependency order:
+
+  - ticket   — Ticket struct, Parse, Marshal, Status/Type constants
+  - config   — .clinban TOML loading and path resolution
+  - lint     — seven schema validation rules
+  - fsm      — status transition table and ValidateTransition
+  - slug     — ASCII-safe title-to-filename slugifier
+  - editor   — $EDITOR process invocation with inherited stdio
+  - store    — atomic writes, ID scanning, active/archive moves
+  - template — embedded interactive ticket template
+
+────────────────────────────────────────────────────────────────────────────────
+2026-05-18  Project start
+
+  Go module scaffolded. Planning pipeline (requirements, architecture, design,
+  tasks) written before any implementation code.
