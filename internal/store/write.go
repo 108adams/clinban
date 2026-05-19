@@ -30,13 +30,28 @@ func (s *Store) WriteTicket(t *ticket.Ticket, path string) error {
 		return fmt.Errorf("store: write ticket: marshal: %w", err)
 	}
 
-	tmpPath := path + ".tmp"
-	if err := os.WriteFile(tmpPath, b, 0o600); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".clinban-*.tmp")
+	if err != nil {
+		return fmt.Errorf("store: write ticket: create temp: %w", err)
+	}
+	tmpPath := tmp.Name()
+
+	if _, err := tmp.Write(b); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("store: write ticket: write temp: %w", err)
+	}
+	if err := tmp.Chmod(0o600); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("store: write ticket: chmod temp: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("store: write ticket: close temp: %w", err)
 	}
 
 	if err := os.Rename(tmpPath, path); err != nil {
-		// Best-effort cleanup of the temp file; ignore cleanup error.
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("store: write ticket: rename: %w", err)
 	}
@@ -47,4 +62,10 @@ func (s *Store) WriteTicket(t *ticket.Ticket, path string) error {
 // formatted as <TicketsDir>/<id>-<slug>.md where id is zero-padded to 4 digits.
 func (s *Store) TicketPath(id int, slug string) string {
 	return filepath.Join(s.TicketsDir, fmt.Sprintf("%04d-%s.md", id, slug))
+}
+
+// ActivePath returns the path a ticket would have in TicketsDir, preserving
+// its filename. Used when moving a ticket from archive back to active.
+func (s *Store) ActivePath(archivePath string) string {
+	return filepath.Join(s.TicketsDir, filepath.Base(archivePath))
 }

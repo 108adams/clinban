@@ -28,8 +28,10 @@ Each ticket is a markdown file with YAML frontmatter that records its ID, status
 type, title, tags, and timestamps. Tickets live in a configured directory and are
 archived when done.`,
 
-	// SilenceUsage prevents Cobra from printing full usage on every error.
-	SilenceUsage: true,
+	// SilenceUsage prevents Cobra from printing usage on every error.
+	// SilenceErrors prevents Cobra from printing returned errors — main owns that.
+	SilenceUsage:  true,
+	SilenceErrors: true,
 
 	// PersistentPreRun runs before every subcommand. It finds the project root,
 	// loads configuration, and initialises the package-level store.

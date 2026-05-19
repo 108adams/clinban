@@ -71,15 +71,23 @@ func runMove(_ *cobra.Command, args []string) error {
 	}
 
 	// Special case: done → backlog moves the file back to the active directory.
+	// Write to the active path first so that a write failure leaves the archive
+	// intact (the file is not moved until the write succeeds).
 	if inArchive && t.Status == ticket.StatusDone && target == ticket.StatusBacklog {
-		newPath, err := st.MoveToActive(path)
-		if err != nil {
-			return fmt.Errorf("move: reopen from archive: %w", err)
+		t.Status = target
+		t.Updated = time.Now()
+		activePath := st.ActivePath(path)
+		if err := st.WriteTicket(t, activePath); err != nil {
+			return fmt.Errorf("move: write to active: %w", err)
 		}
-		path = newPath
+		if err := os.Remove(path); err != nil {
+			return fmt.Errorf("move: remove from archive: %w", err)
+		}
+		fmt.Fprintf(os.Stdout, "%s moved to %s\n", id, target)
+		return nil
 	}
 
-	// Update fields and write.
+	// Standard transition: update fields and write in place.
 	t.Status = target
 	t.Updated = time.Now()
 

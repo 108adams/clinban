@@ -158,7 +158,7 @@ func (s *Store) listDir(dir string, inArchive bool) ([]Record, error) {
 		if e.IsDir() {
 			continue
 		}
-		if filepath.Ext(e.Name()) != ".md" {
+		if idPattern.FindStringSubmatch(e.Name()) == nil {
 			continue
 		}
 		full := filepath.Join(dir, e.Name())

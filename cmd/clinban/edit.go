@@ -35,7 +35,7 @@ func init() {
 func runEdit(cmd *cobra.Command, args []string) error {
 	id := args[0]
 
-	path, _, err := st.FindByID(id)
+	livePath, _, err := st.FindByID(id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			fmt.Fprintln(os.Stderr, "ticket not found")
@@ -44,16 +44,37 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("edit: find ticket: %w", err)
 	}
 
-	filename := filepath.Base(path)
+	filename := filepath.Base(livePath)
+
+	// Copy the live file to a temp in the same directory so the user edits
+	// a scratch copy. The original is only replaced when parse+lint pass.
+	original, err := os.ReadFile(livePath)
+	if err != nil {
+		return fmt.Errorf("edit: read original: %w", err)
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(livePath), ".clinban-edit-*.md")
+	if err != nil {
+		return fmt.Errorf("edit: create temp: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath) // best-effort cleanup; ignored if already renamed
+
+	if _, err := tmp.Write(original); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("edit: write temp: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("edit: close temp: %w", err)
+	}
 
 	for {
-		if err := editor.Open(path); err != nil {
+		if err := editor.Open(tmpPath); err != nil {
 			return fmt.Errorf("edit: open editor: %w", err)
 		}
 
-		raw, err := os.ReadFile(path)
+		raw, err := os.ReadFile(tmpPath)
 		if err != nil {
-			return fmt.Errorf("edit: read file: %w", err)
+			return fmt.Errorf("edit: read temp: %w", err)
 		}
 
 		t, parseErr := ticket.Parse(raw)
@@ -81,8 +102,9 @@ func runEdit(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
+		// Parse+lint passed — write updated timestamp and atomically replace the original.
 		t.Updated = time.Now()
-		if err := st.WriteTicket(t, path); err != nil {
+		if err := st.WriteTicket(t, livePath); err != nil {
 			return fmt.Errorf("edit: write ticket: %w", err)
 		}
 

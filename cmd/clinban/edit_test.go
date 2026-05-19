@@ -48,7 +48,7 @@ func runEditCmd(t *testing.T, bin, dir string, env map[string]string, stdin stri
 
 func createTicketForEdit(t *testing.T, bin, dir string) {
 	t.Helper()
-	_, errStr, code := runEditCmd(t, bin, dir,nil, "", "new", "--no-interactive", "--title", "Test ticket for edit", "--type", "task")
+	_, errStr, code := runEditCmd(t, bin, dir, nil, "", "new", "--no-interactive", "--title", "Test ticket for edit", "--type", "task")
 	if code != 0 {
 		t.Fatalf("setup: create ticket failed: %s", errStr)
 	}
@@ -59,7 +59,7 @@ func TestEditUnknownID(t *testing.T) {
 	bin := buildEditBinary(t)
 	dir := t.TempDir()
 
-	_, stderr, code := runEditCmd(t, bin, dir,nil, "", "edit", "9999")
+	_, stderr, code := runEditCmd(t, bin, dir, nil, "", "edit", "9999")
 	if code == 0 {
 		t.Fatal("expected exit 1 for unknown ID")
 	}
@@ -113,7 +113,7 @@ func TestEditUpdatesTimestamp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, _, code := runEditCmd(t, bin, dir,map[string]string{"EDITOR": editorScript}, "", "edit", "0001")
+	_, _, code := runEditCmd(t, bin, dir, map[string]string{"EDITOR": editorScript}, "", "edit", "0001")
 	if code != 0 {
 		t.Fatal("expected exit 0")
 	}
@@ -139,7 +139,7 @@ func TestEditLintErrorNoReopen(t *testing.T) {
 	}
 
 	// Send "n" to decline reopen.
-	_, stderr, code := runEditCmd(t, bin, dir,map[string]string{"EDITOR": editorScript}, "n\n", "edit", "0001")
+	_, stderr, code := runEditCmd(t, bin, dir, map[string]string{"EDITOR": editorScript}, "n\n", "edit", "0001")
 	if code == 0 {
 		t.Fatal("expected exit 1 on lint failure")
 	}
@@ -170,7 +170,7 @@ fi
 	}
 
 	// Send "y" to reopen after lint error.
-	_, stderr, code := runEditCmd(t, bin, dir,map[string]string{"EDITOR": editorScript}, "y\n", "edit", "0001")
+	_, stderr, code := runEditCmd(t, bin, dir, map[string]string{"EDITOR": editorScript}, "y\n", "edit", "0001")
 	if code != 0 {
 		t.Fatalf("expected exit 0 after successful reopen, got %d; stderr: %s", code, stderr)
 	}

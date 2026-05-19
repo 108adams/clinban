@@ -8,6 +8,7 @@ import (
 
 // MoveToArchive moves the file at path into ArchiveDir.
 // Creates ArchiveDir if it does not exist.
+// Returns an error if a file with the same name already exists in ArchiveDir.
 // Returns the new path in the archive.
 func (s *Store) MoveToArchive(path string) (string, error) {
 	if err := os.MkdirAll(s.ArchiveDir, 0o755); err != nil {
@@ -15,6 +16,10 @@ func (s *Store) MoveToArchive(path string) (string, error) {
 	}
 
 	dest := filepath.Join(s.ArchiveDir, filepath.Base(path))
+	if _, err := os.Stat(dest); err == nil {
+		return "", fmt.Errorf("store: move to archive: destination already exists: %s", filepath.Base(dest))
+	}
+
 	if err := os.Rename(path, dest); err != nil {
 		return "", fmt.Errorf("store: move to archive: rename: %w", err)
 	}
@@ -22,9 +27,14 @@ func (s *Store) MoveToArchive(path string) (string, error) {
 }
 
 // MoveToActive moves the file at path from ArchiveDir into TicketsDir.
+// Returns an error if a file with the same name already exists in TicketsDir.
 // Returns the new path in the active directory.
 func (s *Store) MoveToActive(path string) (string, error) {
 	dest := filepath.Join(s.TicketsDir, filepath.Base(path))
+	if _, err := os.Stat(dest); err == nil {
+		return "", fmt.Errorf("store: move to active: destination already exists: %s", filepath.Base(dest))
+	}
+
 	if err := os.Rename(path, dest); err != nil {
 		return "", fmt.Errorf("store: move to active: rename: %w", err)
 	}
