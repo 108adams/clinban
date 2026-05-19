@@ -73,6 +73,56 @@ Clinban is designed for:
 
 It is intentionally not a large project management system.
 
+## Installation
+
+### Prerequisites
+
+- Go 1.25 or later. Check with:
+
+```bash
+go version
+```
+
+If Go is not installed, follow the instructions at [go.dev/doc/install](https://go.dev/doc/install).
+
+### Clone and install
+
+```bash
+git clone https://gitlab.com/108adams/clinban.git
+cd clinban
+go install ./cmd/clinban
+```
+
+`go install` compiles the binary and places it in your Go binary directory, which is `~/go/bin` by default (or `$GOPATH/bin` if you have `$GOPATH` set).
+
+### Make sure the binary is on your PATH
+
+Check whether the directory is already on your PATH:
+
+```bash
+echo $PATH | tr ':' '\n' | grep go
+```
+
+If nothing appears, add it. For bash or zsh, add this line to your `~/.bashrc` or `~/.zshrc`:
+
+```bash
+export PATH="$PATH:$(go env GOPATH)/bin"
+```
+
+Then reload your shell:
+
+```bash
+source ~/.bashrc   # or ~/.zshrc
+```
+
+### Verify
+
+```bash
+clinban --help
+```
+
+You should see the Clinban command list. If the shell says `command not found`, double-check that the output of `go env GOPATH` resolves to a directory that is on your `$PATH`.
+
 ## Documentation
 
 Start here:

@@ -11,6 +11,7 @@ links:
   - cli
   - ticket-schema
   - architecture
+  - development
 ---
 
 # Documentation Index
@@ -42,3 +43,7 @@ This index is the entry point for the maintained Clinban wiki.
 - [ADR 0001: CLI Framework](adr/0001-cli-framework.md) - Records the decision to use Cobra.
 - [ADR 0002: Package Decomposition](adr/0002-package-decomposition.md) - Records the package separation model.
 - [ADR 0003: Atomic File Writes](adr/0003-atomic-file-writes.md) - Records the write-temp-then-rename strategy.
+
+## Development
+
+- [Development](development.md) - Build, test, vet, and documentation commands; test strategy overview.

@@ -31,6 +31,12 @@ links:
 - Updated: `docs/cli.md`, `docs/ticket-schema.md`, `docs/configuration.md`, `docs/validation.md`, `docs/storage.md`, `docs/security.md`, `docs/architecture.md`, `docs/development.md`, `docs/adr/0001-cli-framework.md`, `docs/adr/0002-package-decomposition.md`, `docs/adr/0003-atomic-file-writes.md`, `docs/index.md`, `docs/log.md`
 - Notes: Distilled remaining pipeline knowledge into current wiki pages and retired the imported pipeline sources.
 
+## [2026-05-19] lint | Wiki health check
+
+- Source: full wiki scan
+- Updated: `docs/index.md`, `docs/schema.md`
+- Notes: Fixed orphan `development.md` (missing from index); expanded scope examples in schema to match pages in use.
+
 ## [2026-05-19] update | Shell completion documentation
 
 - Source: Cobra-generated `clinban completion --help`

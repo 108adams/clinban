@@ -40,7 +40,7 @@ Fields:
 
 - `title`: human-readable page title.
 - `kind`: one of `overview`, `reference`, `architecture`, `decision`, `workflow`, `log`, `schema`.
-- `scope`: short lowercase area such as `project`, `cli`, `tickets`, `storage`, `validation`, or `docs`.
+- `scope`: short lowercase area such as `project`, `cli`, `tickets`, `storage`, `validation`, `architecture`, `configuration`, `security`, `development`, or `docs`.
 - `summary`: one sentence explaining why the page exists.
 - `updated`: date of last meaningful content update in `YYYY-MM-DD`.
 - `links`: related document slugs without `.md`; use `[]` when none apply.
