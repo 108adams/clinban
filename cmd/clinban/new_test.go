@@ -420,3 +420,293 @@ func TestNewNoInteractiveNoTmpFileLeft(t *testing.T) {
 		}
 	}
 }
+
+// --- Interactive (T-17) tests ---
+
+const (
+	interactiveTestTitle = "Fix session expiry bug"
+	interactiveTestType  = "bug"
+	interactiveTestSlug  = "fix-session-expiry-bug"
+	interactiveTestID    = "0001"
+)
+
+// makeEditorScript writes a shell script to dir that, when run as $EDITOR with
+// a file path argument, replaces the title and type placeholder lines with the
+// given values, then exits 0.
+func makeEditorScript(t *testing.T, dir, title, ticketType string) string {
+	t.Helper()
+	// Use sed to replace the empty placeholder lines in-place.
+	script := "#!/bin/sh\n" +
+		"set -e\n" +
+		// Replace 'title: ""' with the provided title.
+		"sed -i 's|title: \"\"|title: \"" + title + "\"|' \"$1\"\n" +
+		// Replace 'type: ""' with the provided type.
+		"sed -i 's|type: \"\"|type: \"" + ticketType + "\"|' \"$1\"\n" +
+		"exit 0\n"
+	scriptPath := dir + "/fake-editor.sh"
+	if err := os.WriteFile(scriptPath, []byte(script), 0o700); err != nil {
+		t.Fatalf("makeEditorScript: %v", err)
+	}
+	return scriptPath
+}
+
+// makeDiscardEditorScript writes a script that does NOT modify the file
+// (simulates the user opening and closing without any changes).
+func makeDiscardEditorScript(t *testing.T, dir string) string {
+	t.Helper()
+	script := "#!/bin/sh\nexit 0\n"
+	scriptPath := dir + "/discard-editor.sh"
+	if err := os.WriteFile(scriptPath, []byte(script), 0o700); err != nil {
+		t.Fatalf("makeDiscardEditorScript: %v", err)
+	}
+	return scriptPath
+}
+
+// makeLintErrorEditorScript writes a script that sets a valid title but leaves
+// type empty (produces a lint error).
+func makeLintErrorEditorScript(t *testing.T, dir, title string) string {
+	t.Helper()
+	script := "#!/bin/sh\n" +
+		"set -e\n" +
+		"sed -i 's|title: \"\"|title: \"" + title + "\"|' \"$1\"\n" +
+		"exit 0\n"
+	scriptPath := dir + "/lint-error-editor.sh"
+	if err := os.WriteFile(scriptPath, []byte(script), 0o700); err != nil {
+		t.Fatalf("makeLintErrorEditorScript: %v", err)
+	}
+	return scriptPath
+}
+
+// runNewInteractive executes "clinban new" (interactive) in workDir, with the
+// given EDITOR environment variable and stdin input.
+func runNewInteractive(t *testing.T, bin, workDir, editor, stdin string) (stdout, stderr string, exitCode int) {
+	t.Helper()
+	cmd := exec.Command(bin, "new")
+	cmd.Dir = workDir
+	cmd.Env = append(os.Environ(), "EDITOR="+editor)
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
+	} else {
+		cmd.Stdin = strings.NewReader("")
+	}
+	var outBuf, errBuf strings.Builder
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+	err := cmd.Run()
+	stdout = outBuf.String()
+	stderr = errBuf.String()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		} else {
+			exitCode = -1
+		}
+	}
+	return stdout, stderr, exitCode
+}
+
+// TestNewInteractiveHappyPath verifies that when $EDITOR fills in a valid title
+// and type, the ticket file appears in TicketsDir with correct content.
+func TestNewInteractiveHappyPath(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	scriptDir := t.TempDir()
+
+	editor := makeEditorScript(t, scriptDir, interactiveTestTitle, interactiveTestType)
+
+	stdout, stderr, code := runNewInteractive(t, bin, dir, editor, "")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+
+	wantFile := fmt.Sprintf("%s-%s.md", interactiveTestID, interactiveTestSlug)
+	if !strings.Contains(stdout, "created:") {
+		t.Errorf("stdout = %q, want 'created:' prefix", stdout)
+	}
+	if !strings.Contains(stdout, wantFile) {
+		t.Errorf("stdout = %q, want to contain %q", stdout, wantFile)
+	}
+
+	ticketPath := filepath.Join(dir, wantFile)
+	if _, err := os.Stat(ticketPath); os.IsNotExist(err) {
+		t.Fatalf("ticket file %q not found in %q", wantFile, dir)
+	}
+
+	content, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("reading ticket: %v", err)
+	}
+	body := string(content)
+
+	checks := []struct {
+		desc    string
+		wantStr string
+	}{
+		{"id field", fmt.Sprintf(`id: "%s"`, interactiveTestID)},
+		{"status field", `status:`},
+		{"type field", interactiveTestType},
+		{"title field", interactiveTestTitle},
+	}
+	for _, c := range checks {
+		if !strings.Contains(body, c.wantStr) {
+			t.Errorf("%s: file does not contain %q\ncontent:\n%s", c.desc, c.wantStr, body)
+		}
+	}
+}
+
+// TestNewInteractiveDiscard verifies that when $EDITOR does not change the
+// template, no ticket file is written and "Ticket discarded." is printed.
+func TestNewInteractiveDiscard(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	scriptDir := t.TempDir()
+
+	editor := makeDiscardEditorScript(t, scriptDir)
+
+	stdout, stderr, code := runNewInteractive(t, bin, dir, editor, "")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+
+	if !strings.Contains(stdout+stderr, "discarded") {
+		t.Errorf("expected 'discarded' in output; stdout=%q stderr=%q", stdout, stderr)
+	}
+
+	// No ticket files should exist.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			t.Errorf("unexpected .md file found after discard: %q", e.Name())
+		}
+	}
+}
+
+// TestNewInteractiveLintErrorPromptsReopen verifies that when the editor
+// produces lint errors, errors are listed and the user is prompted to re-open.
+// The user declines (inputs "n"), so the file is still written and the command
+// exits 0.
+func TestNewInteractiveLintErrorPromptsReopen(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	scriptDir := t.TempDir()
+
+	// Editor sets a title but leaves type as "" — will produce a lint error.
+	editor := makeLintErrorEditorScript(t, scriptDir, interactiveTestTitle)
+
+	// User declines re-open with "n".
+	stdout, stderr, code := runNewInteractive(t, bin, dir, editor, "n\n")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+
+	// Lint errors should be mentioned in output.
+	combined := stdout + stderr
+	if !strings.Contains(combined, "type") && !strings.Contains(combined, "lint") && !strings.Contains(combined, "field") {
+		t.Errorf("expected lint error output; stdout=%q stderr=%q", stdout, stderr)
+	}
+
+	// Re-open prompt should appear.
+	if !strings.Contains(combined, "Re-open") && !strings.Contains(combined, "re-open") {
+		t.Errorf("expected re-open prompt; stdout=%q stderr=%q", stdout, stderr)
+	}
+
+	// The ticket file must still exist (written regardless of lint).
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mdFiles []string
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			mdFiles = append(mdFiles, e.Name())
+		}
+	}
+	if len(mdFiles) == 0 {
+		t.Error("expected ticket file to exist after lint-error path (written regardless of lint)")
+	}
+}
+
+// TestNewInteractiveStatusIsBacklog verifies that interactively created tickets
+// start with status "backlog".
+func TestNewInteractiveStatusIsBacklog(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	scriptDir := t.TempDir()
+
+	editor := makeEditorScript(t, scriptDir, interactiveTestTitle, interactiveTestType)
+	_, _, code := runNewInteractive(t, bin, dir, editor, "")
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	wantFile := fmt.Sprintf("%s-%s.md", interactiveTestID, interactiveTestSlug)
+	content, err := os.ReadFile(filepath.Join(dir, wantFile))
+	if err != nil {
+		t.Fatalf("reading ticket: %v", err)
+	}
+	if !strings.Contains(string(content), "backlog") {
+		t.Errorf("status is not 'backlog' in:\n%s", content)
+	}
+}
+
+// TestNewInteractiveNoTmpFileLeft verifies that no .clinban-*.md temp file
+// remains in TicketsDir after successful interactive creation.
+func TestNewInteractiveNoTmpFileLeft(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	scriptDir := t.TempDir()
+
+	editor := makeEditorScript(t, scriptDir, interactiveTestTitle, interactiveTestType)
+	_, _, code := runNewInteractive(t, bin, dir, editor, "")
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".clinban-") {
+			t.Errorf("temp file left behind: %q", e.Name())
+		}
+	}
+}
+
+// TestNewInteractiveIDAssignment verifies sequential ID assignment in
+// interactive mode when existing tickets are present.
+func TestNewInteractiveIDAssignment(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	scriptDir := t.TempDir()
+
+	// Pre-populate with ticket 0001.
+	writeTicket(t, dir, "0001-existing-ticket.md", validTicketContent("0001"))
+
+	editor := makeEditorScript(t, scriptDir, interactiveTestTitle, interactiveTestType)
+	stdout, stderr, code := runNewInteractive(t, bin, dir, editor, "")
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+
+	if !strings.Contains(stdout, "0002") {
+		t.Errorf("stdout = %q, want to contain '0002'", stdout)
+	}
+
+	wantFile := fmt.Sprintf("0002-%s.md", interactiveTestSlug)
+	if _, err := os.Stat(filepath.Join(dir, wantFile)); os.IsNotExist(err) {
+		t.Errorf("expected ticket file %q not found", wantFile)
+	}
+}
