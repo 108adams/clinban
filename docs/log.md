@@ -37,6 +37,12 @@ links:
 - Updated: `docs/index.md`, `docs/schema.md`
 - Notes: Fixed orphan `development.md` (missing from index); expanded scope examples in schema to match pages in use.
 
+## [2026-05-19] update | clinban init command and default directory layout
+
+- Source: implementation (`cmd/clinban/init.go`, `internal/config/config.go`)
+- Updated: `docs/cli.md`, `docs/configuration.md`, `docs/log.md`
+- Notes: Documented `clinban init`; updated default directory layout from project root to `tickets/` and `tickets/archive/`.
+
 ## [2026-05-19] update | Shell completion documentation
 
 - Source: Cobra-generated `clinban completion --help`

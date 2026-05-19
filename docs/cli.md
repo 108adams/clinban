@@ -17,6 +17,22 @@ Clinban commands operate on the configured active and archive ticket directories
 
 Normal output goes to stdout. User-facing errors go to stderr, except lint violations, which are normal validation output and go to stdout. Exit code `0` means success; exit code `1` means an error or validation failure.
 
+## `clinban init`
+
+Initializes a Clinban project in the current directory by creating three artifacts:
+
+- `tickets/` — active ticket directory
+- `tickets/archive/` — archive directory
+- `.clinban` — TOML configuration file
+
+Each created artifact is reported on stdout (`created: tickets/`, etc.). If any artifact already exists, the command exits `1` and lists each conflict on stderr.
+
+Optional flags:
+
+- `--tickets-dir` (default: `tickets`) — directory for active tickets
+- `--archive-dir` (default: `<tickets-dir>/archive`) — directory for archived tickets
+- `--force` — create only missing artifacts; fails with `already fully initialized` if all already exist
+
 ## `clinban new`
 
 Creates a ticket interactively. Clinban renders a template with system fields, opens `$EDITOR` with fallback to `vi`, and writes the resulting ticket when the user provides a title.

@@ -12,13 +12,13 @@ links:
 
 # Configuration
 
-Clinban configuration lives in a `.clinban` TOML file at the project root.
+Clinban configuration lives in a `.clinban` TOML file at the project root. Use [`clinban init`](cli.md#clinban-init) to create the file and directories in one step.
 
 ## File Format
 
 ```toml
-tickets_dir = "tasks"
-archive_dir = "tasks/archive"
+tickets_dir = "tickets"
+archive_dir = "tickets/archive"
 ```
 
 Both fields are optional.
@@ -27,7 +27,7 @@ Both fields are optional.
 
 If `.clinban` is absent:
 
-- `tickets_dir` defaults to the project root.
+- `tickets_dir` defaults to `tickets/` inside the project root.
 - `archive_dir` defaults to `<tickets_dir>/archive`.
 
 If only `tickets_dir` is set, `archive_dir` defaults to `<tickets_dir>/archive`.
