@@ -37,7 +37,7 @@ func runShow(_ *cobra.Command, args []string) error {
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			fmt.Fprintln(os.Stderr, "ticket not found")
-			os.Exit(1)
+			return ExitError{Code: 1, Err: fmt.Errorf("ticket not found")}
 		}
 		return fmt.Errorf("show: find ticket: %w", err)
 	}

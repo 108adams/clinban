@@ -44,7 +44,7 @@ func runMove(_ *cobra.Command, args []string) error {
 	target := ticket.Status(targetStr)
 	if !target.Valid() {
 		fmt.Fprintf(os.Stderr, "invalid status %q: must be one of backlog, in-progress, blocked, done\n", targetStr)
-		os.Exit(1)
+		return ExitError{Code: 1, Err: fmt.Errorf("invalid status %q", targetStr)}
 	}
 
 	// Locate the ticket file.
@@ -52,7 +52,7 @@ func runMove(_ *cobra.Command, args []string) error {
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			fmt.Fprintln(os.Stderr, "ticket not found")
-			os.Exit(1)
+			return ExitError{Code: 1, Err: fmt.Errorf("ticket not found")}
 		}
 		return fmt.Errorf("move: find ticket: %w", err)
 	}
@@ -71,7 +71,7 @@ func runMove(_ *cobra.Command, args []string) error {
 	// Validate the FSM transition.
 	if err := fsm.ValidateTransition(t.Status, target); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return ExitError{Code: 1, Err: err}
 	}
 
 	// Special case: done → backlog moves the file back to the active directory.

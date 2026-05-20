@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,9 +53,17 @@ archived when done.`,
 // Execute runs the Clinban root command.
 //
 // It is separated from main so command tests can execute the CLI entry point
-// without duplicating process setup.
-func Execute() error {
-	return rootCmd.Execute()
+// without duplicating process setup. If the command returns an ExitError,
+// Execute calls os.Exit with the carried code so that deferred cleanup in
+// callers still runs. Any other error exits with code 1.
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		var exitErr ExitError
+		if errors.As(err, &exitErr) {
+			os.Exit(exitErr.Code)
+		}
+		os.Exit(1)
+	}
 }
 
 // findProjectRoot walks upward from the current directory looking for .clinban.
