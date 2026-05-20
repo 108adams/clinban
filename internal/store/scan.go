@@ -101,7 +101,13 @@ func (s *Store) NextID() (int, error) {
 //
 // Active tickets are searched before archived tickets. If no matching file is
 // found, FindByID returns ErrNotFound.
+//
+// The id argument is normalised to a four-digit zero-padded string before
+// matching, so "1", "01", "001", and "0001" are all equivalent.
 func (s *Store) FindByID(id string) (path string, inArchive bool, err error) {
+	if n, parseErr := strconv.Atoi(id); parseErr == nil {
+		id = fmt.Sprintf("%04d", n)
+	}
 	for _, dir := range []string{s.TicketsDir, s.ArchiveDir} {
 		entries, readErr := os.ReadDir(dir)
 		if readErr != nil {

@@ -190,6 +190,18 @@ func TestFindByID(t *testing.T) {
 			wantInArc: false,
 		},
 		{
+			name:      "short id 005 normalised to 0005",
+			id:        "005",
+			wantPath:  filepath.Join(s.TicketsDir, "0005-fix-login-timeout-on.md"),
+			wantInArc: false,
+		},
+		{
+			name:      "short id 5 normalised to 0005",
+			id:        "5",
+			wantPath:  filepath.Join(s.TicketsDir, "0005-fix-login-timeout-on.md"),
+			wantInArc: false,
+		},
+		{
 			name:    "missing returns ErrNotFound",
 			id:      "9999",
 			wantErr: store.ErrNotFound,
