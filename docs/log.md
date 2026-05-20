@@ -3,7 +3,7 @@ title: Documentation Log
 kind: log
 scope: docs
 summary: Records chronological maintenance activity for the Clinban documentation wiki.
-updated: 2026-05-19
+updated: 2026-05-20
 links:
   - index
   - schema
@@ -48,3 +48,9 @@ links:
 - Source: Cobra-generated `clinban completion --help`
 - Updated: `docs/cli.md`, `docs/log.md`
 - Notes: Documented shell completion generation for bash, zsh, fish, and powershell.
+
+## [2026-05-20] update | GitHub migration — module path and CI
+
+- Source: migration commit `6a0cd17`
+- Updated: `docs/development.md`, `docs/log.md`
+- Notes: Added CI section documenting GitHub Actions workflow; no other wiki pages had stale GitLab or old module path references.

@@ -3,7 +3,7 @@ title: Development
 kind: workflow
 scope: development
 summary: Records build, test, documentation, and maintenance workflows for Clinban.
-updated: 2026-05-19
+updated: 2026-05-20
 links:
   - architecture
   - documentation
@@ -46,6 +46,10 @@ go doc ./internal/store
 ```
 
 Markdown project documentation lives under `docs/` and follows [Documentation Schema](schema.md).
+
+## CI
+
+GitHub Actions runs `go vet ./...` and `go test ./...` on every push and pull request to `main`. The workflow is defined in `.github/workflows/ci.yml`.
 
 ## Test Strategy
 
