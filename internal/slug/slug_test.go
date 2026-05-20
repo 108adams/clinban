@@ -15,7 +15,15 @@ const (
 	titleSpecialChars  = "Hello, World! (urgent)"
 	wantSpecialChars   = "hello-world-urgent"
 	titleEmpty         = ""
-	wantEmpty          = ""
+	wantEmpty          = "ticket" // fallback: empty input yields "ticket"
+
+	// TASK-009 fallback cases.
+	titleCJK         = "你好世界"
+	wantCJK          = "ticket"
+	titleAllPunct    = "!!! ??? ..."
+	wantAllPunct     = "ticket"
+	titleHelloWorld  = "Hello World"
+	wantHelloWorld   = "hello-world"
 )
 
 func TestSlugify(t *testing.T) {
@@ -45,7 +53,23 @@ func TestSlugify(t *testing.T) {
 		{
 			name:  "empty string",
 			input: titleEmpty,
-			want:  wantEmpty,
+			want:  wantEmpty, // returns "ticket" fallback
+		},
+		// TASK-009 — fallback cases
+		{
+			name:  "all CJK returns ticket fallback",
+			input: titleCJK,
+			want:  wantCJK,
+		},
+		{
+			name:  "all punctuation returns ticket fallback",
+			input: titleAllPunct,
+			want:  wantAllPunct,
+		},
+		{
+			name:  "hello world regression",
+			input: titleHelloWorld,
+			want:  wantHelloWorld,
 		},
 		// P1 — Business logic
 		{
@@ -92,7 +116,7 @@ func TestSlugify(t *testing.T) {
 		{
 			name:  "all special characters in title",
 			input: "!!! ??? ---",
-			want:  "",
+			want:  "ticket", // returns "ticket" fallback
 		},
 		{
 			name:  "exactly five words already",

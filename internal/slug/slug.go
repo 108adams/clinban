@@ -40,5 +40,9 @@ func Slugify(title string) string {
 		parts = append(parts, cleaned)
 	}
 
-	return strings.Join(parts, "-")
+	result := strings.Join(parts, "-")
+	if result == "" {
+		return "ticket"
+	}
+	return result
 }
