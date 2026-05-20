@@ -36,6 +36,16 @@ gofmt -w <file>     # fix a specific file
 
 All three must pass before submitting.
 
+### Module hygiene (CI guard)
+
+After adding or removing imports, run:
+
+```bash
+go mod tidy && git diff --exit-code go.mod go.sum
+```
+
+The `git diff --exit-code` step fails if `go mod tidy` made any changes, which means `go.mod` or `go.sum` was out of sync. This command is run in CI to enforce that every commit keeps the module files tidy. Run it locally before pushing.
+
 ### TDD
 
 Write a failing test before writing implementation. The cycle is:
