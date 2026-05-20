@@ -528,6 +528,59 @@ func TestMoveToActive(t *testing.T) {
 	}
 }
 
+func TestMoveToArchiveRefusesExistingDestination(t *testing.T) {
+	t.Parallel()
+	s := newStore(t)
+
+	// Pre-create the destination in ArchiveDir.
+	if err := os.MkdirAll(s.ArchiveDir, 0o755); err != nil {
+		t.Fatalf("setup: mkdir archive: %v", err)
+	}
+	tk := makeTicket("0001", testTitle)
+	src := writeTicketFile(t, s.TicketsDir, "0001-fix-login.md", tk)
+	writeTicketFile(t, s.ArchiveDir, "0001-fix-login.md", tk)
+
+	_, err := s.MoveToArchive(src)
+	if err == nil {
+		t.Fatal("MoveToArchive: expected error when destination already exists, got nil")
+	}
+	if !strings.Contains(err.Error(), "destination already exists") {
+		t.Errorf("error message %q does not contain 'destination already exists'", err.Error())
+	}
+
+	// Source file must still exist after the failed move.
+	if _, statErr := os.Stat(src); statErr != nil {
+		t.Errorf("source file %q must still exist after failed MoveToArchive: %v", src, statErr)
+	}
+}
+
+func TestMoveToActiveRefusesExistingDestination(t *testing.T) {
+	t.Parallel()
+	s := newStore(t)
+
+	if err := os.MkdirAll(s.ArchiveDir, 0o755); err != nil {
+		t.Fatalf("setup: mkdir archive: %v", err)
+	}
+
+	// Pre-create the destination in TicketsDir.
+	tk := makeTicket("0001", testTitle)
+	src := writeTicketFile(t, s.ArchiveDir, "0001-fix-login.md", tk)
+	writeTicketFile(t, s.TicketsDir, "0001-fix-login.md", tk)
+
+	_, err := s.MoveToActive(src)
+	if err == nil {
+		t.Fatal("MoveToActive: expected error when destination already exists, got nil")
+	}
+	if !strings.Contains(err.Error(), "destination already exists") {
+		t.Errorf("error message %q does not contain 'destination already exists'", err.Error())
+	}
+
+	// Source file must still exist after the failed move.
+	if _, statErr := os.Stat(src); statErr != nil {
+		t.Errorf("source file %q must still exist after failed MoveToActive: %v", src, statErr)
+	}
+}
+
 // ---- TestListActive ----
 
 func TestListActive(t *testing.T) {
