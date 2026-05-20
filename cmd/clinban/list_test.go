@@ -56,6 +56,7 @@ func runList(t *testing.T, bin, workDir string, args ...string) (stdout, stderr 
 	cmdArgs := append([]string{"list"}, args...)
 	cmd := exec.Command(bin, cmdArgs...)
 	cmd.Dir = workDir
+	cmd.Env = coverEnv()
 	var outBuf, errBuf strings.Builder
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf

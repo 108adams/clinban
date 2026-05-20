@@ -27,6 +27,7 @@ func runNew(t *testing.T, bin, workDir string, args ...string) (stdout, stderr s
 	cmdArgs := append([]string{"new", "--no-interactive"}, args...)
 	cmd := exec.Command(bin, cmdArgs...)
 	cmd.Dir = workDir
+	cmd.Env = coverEnv()
 	var outBuf, errBuf strings.Builder
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf
@@ -483,7 +484,7 @@ func runNewInteractive(t *testing.T, bin, workDir, editor, stdin string) (stdout
 	t.Helper()
 	cmd := exec.Command(bin, "new")
 	cmd.Dir = workDir
-	cmd.Env = append(os.Environ(), "EDITOR="+editor)
+	cmd.Env = append(coverEnv(), "EDITOR="+editor)
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
 	} else {

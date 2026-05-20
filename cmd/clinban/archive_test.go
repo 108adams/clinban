@@ -63,6 +63,7 @@ func runArchive(t *testing.T, bin, workDir string, stdinInput string, args ...st
 	cmdArgs := append([]string{"archive"}, args...)
 	cmd := exec.Command(bin, cmdArgs...)
 	cmd.Dir = workDir
+	cmd.Env = coverEnv()
 	if stdinInput != "" {
 		cmd.Stdin = strings.NewReader(stdinInput)
 	}

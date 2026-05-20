@@ -12,7 +12,7 @@ func runEditCmd(t *testing.T, bin, dir string, env map[string]string, stdin stri
 	t.Helper()
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = dir
-	e := os.Environ()
+	e := coverEnv()
 	e = append(e, "HOME="+dir)
 	for k, v := range env {
 		e = append(e, k+"="+v)

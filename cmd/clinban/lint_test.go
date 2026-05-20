@@ -47,42 +47,34 @@ updated: %s
 `, id, now, now)
 }
 
-// buildBinary compiles the clinban binary into a temp dir and returns its path.
-// The binary is built once per test run via a TestMain pattern, but here we
-// build per-test using t.TempDir() as the output directory.
+// buildBinary returns the path to the clinban test binary.
+//
+// When TestMain has successfully built a coverage-instrumented binary
+// (testBin != ""), that shared binary is returned immediately — no rebuild.
+// This avoids a redundant "go build" per test and ensures all subprocess
+// executions use the -cover binary so their counters land in testCoverDir.
+//
+// If TestMain's build failed (graceful-degradation path), a plain binary is
+// compiled into a per-test temp directory as a fallback.
 func buildBinary(t *testing.T) string {
 	t.Helper()
+	if testBin != "" {
+		return testBin
+	}
+	// Fallback: build without -cover into a per-test temp dir.
+	root, err := findModuleRoot()
+	if err != nil {
+		t.Fatalf("buildBinary: %v", err)
+	}
 	binDir := t.TempDir()
 	binPath := filepath.Join(binDir, "clinban")
 	cmd := exec.Command("go", "build", "-o", binPath, "./cmd/clinban/")
-	cmd.Dir = projectRoot(t)
+	cmd.Dir = root
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("build failed: %v\n%s", err, out)
 	}
 	return binPath
-}
-
-// projectRoot returns the root of the go module (the directory containing go.mod).
-func projectRoot(t *testing.T) string {
-	t.Helper()
-	// The test file lives in cmd/clinban/, so the module root is two levels up.
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Walk up until we find go.mod.
-	dir := wd
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatal("could not find go.mod")
-		}
-		dir = parent
-	}
 }
 
 // setupWorkDir creates a temp directory tree matching the default layout:
@@ -120,6 +112,7 @@ func runLint(t *testing.T, bin, workDir string, args ...string) (stdout, stderr 
 	cmdArgs := append([]string{"lint"}, args...)
 	cmd := exec.Command(bin, cmdArgs...)
 	cmd.Dir = workDir
+	cmd.Env = coverEnv()
 	var outBuf, errBuf strings.Builder
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf

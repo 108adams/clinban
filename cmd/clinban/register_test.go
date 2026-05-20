@@ -60,6 +60,7 @@ func runRegister(t *testing.T, bin, workDir, path string) (stdout, stderr string
 	t.Helper()
 	cmd := exec.Command(bin, "register", path)
 	cmd.Dir = workDir
+	cmd.Env = coverEnv()
 	var outBuf, errBuf strings.Builder
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf
@@ -259,6 +260,7 @@ func TestRegisterNoArgument(t *testing.T) {
 
 	cmd := exec.Command(bin, "register")
 	cmd.Dir = root
+	cmd.Env = coverEnv()
 	err := cmd.Run()
 	if err == nil {
 		t.Fatal("expected exit code 1, got 0")
