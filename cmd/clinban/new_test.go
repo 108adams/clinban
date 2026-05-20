@@ -685,6 +685,49 @@ func TestNewInteractiveNoTmpFileLeft(t *testing.T) {
 	}
 }
 
+// TestNewInteractiveNoDoubleCountID is a regression test for the bug where
+// AllIDs() was called after os.Rename(), causing the new ticket's ID to appear
+// twice in allIDsWithNew and triggering a false-positive ruleIDUnique lint
+// error immediately after a successful creation.
+//
+// Setup: pre-seed ticket 0001, create ticket 0002 interactively.
+// Assertion: no lint error fires (stderr must not contain "unique" or "not unique"),
+// and the new file exists with exit code 0.
+func TestNewInteractiveNoDoubleCountID(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	root, ticketsDir, _ := setupWorkDir(t)
+	scriptDir := t.TempDir()
+
+	// Pre-populate tickets dir with ticket 0001 so NextID returns 2.
+	writeTicket(t, ticketsDir, "0001-existing-ticket.md", validTicketContent("0001"))
+
+	// Editor fills in a valid title and type for the new ticket.
+	editor := makeEditorScript(t, scriptDir, "Regression double count id", "task")
+
+	stdout, stderr, code := runNewInteractive(t, bin, root, editor, "")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+
+	// The bug manifested as a false-positive "not unique" lint error on stderr.
+	if strings.Contains(stderr, "unique") || strings.Contains(stderr, "not unique") {
+		t.Errorf("false-positive ID uniqueness lint error fired; stderr=%q", stderr)
+	}
+
+	// The new ticket file must be created successfully.
+	wantFile := "0002-regression-double-count-id.md"
+	if _, err := os.Stat(filepath.Join(ticketsDir, wantFile)); os.IsNotExist(err) {
+		t.Errorf("expected ticket file %q not found in %q", wantFile, ticketsDir)
+	}
+
+	// stdout must contain the "created:" success message.
+	if !strings.Contains(stdout, "created:") {
+		t.Errorf("stdout = %q, want 'created:' message", stdout)
+	}
+}
+
 // TestNewInteractiveIDAssignment verifies sequential ID assignment in
 // interactive mode when existing tickets are present.
 func TestNewInteractiveIDAssignment(t *testing.T) {

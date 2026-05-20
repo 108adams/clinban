@@ -123,20 +123,24 @@ func runNewInteractive() error {
 	finalPath := st.TicketPath(nextID, titleSlug)
 	filename := filepath.Base(finalPath)
 
-	// Move temp file to final location (regardless of lint state).
-	if err := os.Rename(tmpPath, finalPath); err != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("new: rename to final path: %w", err)
-	}
-
-	// Run lint on the parsed ticket.
+	// Collect existing IDs before the Rename so the new ticket is not yet
+	// visible to the disk scan. AllIDs must be called here — after Rename the
+	// new file lands on disk and the subsequent append would double-count its
+	// ID, causing ruleIDUnique to fire a false-positive.
 	allIDs, err := st.AllIDs()
 	if err != nil {
 		return fmt.Errorf("new: collect ids: %w", err)
 	}
 	// Append the new ticket's ID so rule 7 can see it alongside all existing IDs.
+	// The ticket is not yet on disk at this point, so AllIDs did not include it.
 	idStr := fmt.Sprintf("%04d", nextID)
 	allIDsWithNew := append(allIDs, idStr) //nolint:gocritic // intentional copy via append
+
+	// Move temp file to final location (regardless of lint state).
+	if err := os.Rename(tmpPath, finalPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("new: rename to final path: %w", err)
+	}
 
 	// Lint/re-open loop.
 	for {
