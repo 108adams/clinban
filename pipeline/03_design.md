@@ -1,217 +1,274 @@
-# Design: clinban init
+# Implementation Design
 _Produced by: techlead-agent_
-_Date: 2026-05-19_
+_Date: 2026-05-20_
 _Status: draft_
-_Input: pipeline/02_architecture.md_
+_Input: pipeline/quality-audit.md (no 02_architecture.md — hardening sprint only)_
+
+## Scope note
+
+This is a hardening sprint. Module boundaries are stable and unchanged. Every
+change is a targeted fix or addition within existing packages. No new packages
+are introduced.
+
+---
 
 ## Module Structure
 
-### internal/config — defaults update
+### internal/store — write.go (D-1)
 
 **Files:**
-- `internal/config/config.go` — update `defaults()` to return `tickets/` and `tickets/archive/` subdirectories
+- `internal/store/write.go` — add fsync of temp file and parent directory to `WriteTicket`
 
 **Key types / functions:**
 
 | Name | Signature | Responsibility |
-|------|-----------|----------------|
-| `defaults` | `(projectRoot string) → *Config` | Returns canonical default paths; **change**: `TicketsDir = filepath.Join(projectRoot, "tickets")`, `ArchiveDir = filepath.Join(projectRoot, "tickets", "archive")` |
+|------|-----------|---------------|
+| `WriteTicket` | `(t *ticket.Ticket, path string) → error` | Serialize ticket to path atomically; after this change, also fsync-durable |
 
 **Interface contract:**
-- Accepts: `projectRoot` — an absolute path to the project root directory
-- Returns: `*Config` with `TicketsDir` and `ArchiveDir` set to absolute paths under `projectRoot`
-- Errors: none (pure construction)
-
----
-
-### internal/config — test update
-
-**Files:**
-- `internal/config/config_test.go` — update two tests that assert on the old default values
-
-**Tests to update:**
-
-| Test | Old assertion | New assertion |
-|------|--------------|---------------|
-| `TestLoad_AbsentFile` | `TicketsDir == dir`, `ArchiveDir == dir/archive` | `TicketsDir == dir/tickets`, `ArchiveDir == dir/tickets/archive` |
-| `TestLoad_EmptyTOML` | `TicketsDir == dir`, `ArchiveDir == dir/archive` | `TicketsDir == dir/tickets`, `ArchiveDir == dir/tickets/archive` |
-| `TestLoad_PartialConfig_ArchiveDirOnly` | `TicketsDir == dir` (default) | `TicketsDir == dir/tickets` (new default) |
-
-Note: `TestLoad_PartialConfig_ArchiveDirOnly` sets only `archive_dir`; the `TicketsDir` falls back to the default, which will now be `dir/tickets`.
-
----
-
-### cmd/clinban — shared test infrastructure
-
-**Files:**
-- `cmd/clinban/lint_test.go` — add `setupWorkDir` helper alongside existing `buildBinary`, `writeTicket`, `projectRoot`
-
-**Key types / functions:**
-
-| Name | Signature | Responsibility |
-|------|-----------|----------------|
-| `setupWorkDir` | `(t *testing.T) → (root, ticketsDir, archiveDir string)` | Creates a temp dir tree matching the new default layout; returns all three paths for test use |
-
-**Interface contract:**
-- Accepts: `*testing.T`
-- Returns: `root` (the temp dir itself), `ticketsDir` (`root/tickets`), `archiveDir` (`root/tickets/archive`)
-- Errors: calls `t.Fatal` on any `os.MkdirAll` failure; all returned paths are guaranteed to exist
+- Accepts: a valid `*ticket.Ticket` and an absolute target path
+- Returns: `nil` on success; wrapped error on marshal failure, temp-file I/O failure, chmod failure, sync failure, or rename failure
+- Errors: all wrapped with prefix `"store: write ticket: ..."`
+- Change: `tmp.Sync()` is called after `tmp.Chmod` and before `tmp.Close()`; after `os.Rename` succeeds, the parent directory is opened and `Sync()`'d to make the directory entry durable; the directory fd is always closed
 
 **Implementation notes:**
-1. Call `t.TempDir()` to get `root`
-2. Call `os.MkdirAll(filepath.Join(root, "tickets", "archive"), 0o755)` to create both subdirs in one shot
-3. Derive and return the three paths
-
----
-
-### cmd/clinban — existing integration tests migration
-
-**Files affected (all in `cmd/clinban/`):**
-- `lint_test.go`
-- `list_test.go`
-- `new_test.go`
-- `move_test.go`
-- `show_test.go`
-- `archive_test.go`
-- `edit_test.go`
-- `register_test.go`
-
-**Migration pattern:**
-
-Before:
-```go
-dir := t.TempDir()
-writeTicket(t, dir, "some-file.md", content)
-cmd.Dir = dir
-archivePath := filepath.Join(dir, "archive", filename)
 ```
+// After chmod, before close:
+if err := tmp.Sync(); err != nil { ... }
 
-After:
-```go
-root, ticketsDir, archiveDir := setupWorkDir(t)
-writeTicket(t, ticketsDir, "some-file.md", content)
-cmd.Dir = root
-archivePath := filepath.Join(archiveDir, filename)
-```
-
-The `cmd.Dir` must be set to `root` (not `ticketsDir`) so that `findProjectRoot()` and `config.defaults()` resolve paths from the project root, not the tickets subdirectory.
-
----
-
-### cmd/clinban/init.go — new command
-
-**Files:**
-- `cmd/clinban/init.go` — implements `initCmd` and its `runInit` function; registers with `rootCmd` in `init()`
-
-**Key types / functions:**
-
-| Name | Signature | Responsibility |
-|------|-----------|----------------|
-| `initFlags` | struct | Holds parsed flag values for the init command |
-| `newInitCmd` | `() → *cobra.Command` | Constructs and returns the configured `initCmd` with flags and `PersistentPreRun` override |
-| `runInit` | `(flags initFlags) → error` | Implements the full init algorithm: resolve paths, pre-flight check, conditional creation, output |
-
-**Flags struct:**
-```go
-type initFlags struct {
-    ticketsDir string // --tickets-dir, default "tickets"
-    archiveDir string // --archive-dir, default "" (derived at runtime)
-    force      bool   // --force
+// After os.Rename succeeds:
+dir, err := os.Open(filepath.Dir(path))
+if err == nil {
+    _ = dir.Sync()
+    _ = dir.Close()
 }
 ```
 
-**Interface contract for `runInit`:**
-- Accepts: `initFlags` with flag values as provided by the user (relative or absolute strings)
-- Returns: `error` — the caller (`RunE` on the command) prints to stderr and exits 1 on non-nil
-- Errors:
-  - Exits 1 if `os.Getwd()` fails
-  - Exits 1 (via returned error) if any artifact exists and `--force` is not set
-  - Exits 1 (via returned error) if all artifacts exist and `--force` is set
-  - Exits 1 (via returned error) if `os.Mkdir` fails for a directory
-  - Exits 1 (via returned error) if `os.WriteFile` fails for `.clinban`
-
-**`runInit` algorithm (exact):**
-1. If `flags.archiveDir == ""`, set `flags.archiveDir = filepath.Join(flags.ticketsDir, "archive")`
-2. Get CWD via `os.Getwd()`; return error on failure
-3. Resolve absolute paths using `filepath.IsAbs` check (same logic as `config.absPath`):
-   - `absTickets = filepath.Join(cwd, flags.ticketsDir)` if relative
-   - `absArchive = filepath.Join(cwd, flags.archiveDir)` if relative
-   - `absConfig  = filepath.Join(cwd, ".clinban")`
-4. Pre-flight: stat all three; record which exist
-5. Without `--force`: if any exist → print each to stderr as `"already exists: <name>"`, print `"re-run with --force to create missing items"`, return error
-6. With `--force`: if all exist → print `"already fully initialized"` to stderr, return error
-7. Write order for missing artifacts: `tickets/` → `tickets/archive/` → `.clinban`
-8. For each artifact created, print to stdout: `"created: tickets/"`, `"created: tickets/archive/"`, `"created: .clinban"`
-9. Use `os.Mkdir` (not `MkdirAll`) for directories
-10. `.clinban` content written via `fmt.Fprintf` using relative (flag) values:
-    ```
-    tickets_dir = %q\narchive_dir = %q\n
-    ```
-    Written with `os.WriteFile(..., 0o600)`
-
-**`PersistentPreRun` override:**
-```go
-PersistentPreRun: func(cmd *cobra.Command, args []string) {},
-```
-This overrides `rootCmd.PersistentPreRun` for the `init` subcommand only, bypassing `findProjectRoot()` and store initialisation. The package-level `st` and `cfg` vars remain nil; `runInit` must not reference them.
-
 ---
 
-### cmd/clinban/init_test.go — new integration tests
+### internal/store — move.go (D-2)
 
 **Files:**
-- `cmd/clinban/init_test.go` — five integration test functions using the compiled binary
+- `internal/store/move.go` — replace TOCTOU `os.Stat` + `os.Rename` pattern with `os.Link` + `os.Remove`
 
-**Test functions:**
+**Key types / functions:**
 
-| Function | Scenario | Key assertions |
-|----------|----------|----------------|
-| `TestInitFreshDirectory` | Clean dir, no prior artifacts | Exit 0; stdout contains `"created: .clinban"`, `"created: tickets/"`, `"created: tickets/archive/"` |
-| `TestInitAlreadyExists_NoForce` | All three artifacts exist, no `--force` | Exit 1; stderr contains each artifact name |
-| `TestInitAlreadyExists_WithForce` | All three artifacts exist, `--force` | Exit 1; stderr contains `"already fully initialized"` |
-| `TestInitPartial_DirsExist_NoConfig_Force` | `tickets/` and `tickets/archive/` exist, no `.clinban`, `--force` | Exit 0; stdout contains `"created: .clinban"`; no `"created: tickets/"` in stdout |
-| `TestInitPartial_ConfigExists_NoDirs_Force` | `.clinban` exists, dirs absent, `--force` | Exit 0; stdout contains `"created: tickets/"` and `"created: tickets/archive/"`; no `"created: .clinban"` in stdout |
+| Name | Signature | Responsibility |
+|------|-----------|---------------|
+| `MoveToArchive` | `(path string) → (string, error)` | Move ticket file to archive atomically, refusing collision |
+| `MoveToActive` | `(path string) → (string, error)` | Move ticket file to active dir atomically, refusing collision |
+
+**Interface contract:**
+- Accepts: source path of an existing ticket file
+- Returns: new path on success; error if destination already exists or any I/O fails
+- Errors: `"store: move to archive: link: ..."` / `"store: move to active: link: ..."` on collision or I/O failure; `"store: move to archive: remove: ..."` / `"store: move to active: remove: ..."` on source removal failure
+- Change: `os.Stat(dest)` + `os.Rename(src, dest)` is replaced with `os.Link(src, dest)` followed by `os.Remove(src)`; `os.Link` returns `EEXIST` atomically if dest exists, which becomes the collision error; no silent overwrite is possible
+
+**Implementation notes:**
+- `os.Link` is POSIX-standard and available on all target platforms (Linux, macOS)
+- If `os.Link` succeeds but `os.Remove` fails, the source file still exists alongside the new hard link; the caller gets an error and can retry
+- The existing error message text "destination already exists: ..." is preserved by checking `errors.Is(err, fs.ErrExist)` after `os.Link`
 
 ---
 
-## Interface Contracts
+### internal/lint — rules.go (D-3)
+
+**Files:**
+- `internal/lint/rules.go` — delete `ruleTimestampsNonZero`; update `ruleRequiredFields` to emit the precise timestamp message for zero `Created`/`Updated`
+
+**Key types / functions:**
+
+| Name | Signature | Responsibility |
+|------|-----------|---------------|
+| `ruleRequiredFields` | `(t *ticket.Ticket, filename string, _ []string) → []LintError` | Check all required fields; now also emits precise RFC3339 message for zero timestamps |
+| `ruleTimestampsNonZero` | _deleted_ | Was rule 5; merged into rule 1 |
+
+**Interface contract:**
+- Accepts: parsed ticket, filename, allIDs slice (unused by this rule)
+- Returns: one `LintError` per missing or zero-timestamp field; never two errors for the same field
+- Errors: for `Created` zero value: `Message: "zero timestamp; value was not parseable as RFC3339"`; for `Updated` zero value: same message; replaces the previous `"required field missing"` message for timestamp fields
+- Change: `ruleTimestampsNonZero` is removed from the rule list in `lint.go`; `ruleRequiredFields` replaces its `t.Created.IsZero()` branch with the precise message; same for `t.Updated`
+
+**Implementation notes:**
+- The rule registration slice in `lint.go` (or wherever rules are wired) must have `ruleTimestampsNonZero` removed; confirm the variable name at wiring site before deleting
+- Lint tests that assert on timestamp error messages must be updated to expect exactly one error per zero field with the precise message
+
+---
+
+### internal/slug — slug.go (D-4)
+
+**Files:**
+- `internal/slug/slug.go` — add fallback return value `"ticket"` when `Slugify` produces an empty string
+
+**Key types / functions:**
+
+| Name | Signature | Responsibility |
+|------|-----------|---------------|
+| `Slugify` | `(title string) → string` | Convert title to a filesystem-safe slug; now returns `"ticket"` instead of `""` for all-non-ASCII / all-punctuation input |
+
+**Interface contract:**
+- Accepts: any string
+- Returns: a non-empty slug string; `"ticket"` when no ASCII-alphanumeric characters survive stripping
+- Errors: none (pure function)
+- Change: one line added at the end of the function: `if result == ""; return "ticket"`
+
+---
+
+### internal/editor — editor_test.go (T-1a)
+
+**Files:**
+- `internal/editor/editor_test.go` — new file; 3 test functions
+
+**Key types / functions:**
+
+| Name | Signature | Responsibility |
+|------|-----------|---------------|
+| `TestEditorSuccess` | `(t *testing.T)` | EDITOR=/bin/true → Open returns nil |
+| `TestEditorFailure` | `(t *testing.T)` | EDITOR=/bin/false → Open returns error containing "exit status" |
+| `TestEditorFallback` | `(t *testing.T)` | EDITOR="" + nonexistent path → error contains "executable file not found" (proves vi fallback path is reached) |
+
+**Interface contract (test perspective):**
+- Each test sets `t.Setenv("EDITOR", ...)` to isolate environment
+- Tests create a `t.TempDir()` file to pass as the path argument
+- `TestEditorFallback` overrides `PATH` so `vi` is not found, proving the fallback branch executes
+
+---
+
+### internal/template — template_test.go (T-1b)
+
+**Files:**
+- `internal/template/template_test.go` — new file; 2 test functions
+
+**Key types / functions:**
+
+| Name | Signature | Responsibility |
+|------|-----------|---------------|
+| `TestNewReturnsParseableTicket` | `(t *testing.T)` | `New(1, someTime)` returns non-empty bytes that `ticket.Parse` accepts without error |
+| `TestNewContainsIDAndTimestamp` | `(t *testing.T)` | rendered bytes contain the ID (`"0001"` or `"1"`) and timestamp in expected RFC3339 format |
+
+**Interface contract (test perspective):**
+- Parse/execute error branches are defensive (embedded template is always valid at compile time) and are not directly exercisable; they are not tested
+- Tests use a fixed `time.Time` value for deterministic assertions
+
+---
+
+### cmd/clinban — exit.go (Q-2)
+
+**Files:**
+- `cmd/clinban/exit.go` — new file; defines `ExitError` type
+
+**Key types / functions:**
+
+| Name | Signature | Responsibility |
+|------|-----------|---------------|
+| `ExitError` | `struct{ Code int; Err error }` | Typed error carrying a process exit code |
+| `(e ExitError) Error()` | `() → string` | Implement `error`; delegates to `e.Err.Error()` |
+| `(e ExitError) Unwrap()` | `() → error` | Implement `errors.Unwrap`; returns `e.Err` |
+
+**Interface contract:**
+- `ExitError.Code` is the intended `os.Exit` code (1 for user-visible failures)
+- `Execute()` in `root.go` checks `errors.As(err, &exitErr)` after `rootCmd.Execute()` and calls `os.Exit(exitErr.Code)` when matched; otherwise exits with code 1
+- Initial migration scope: `show.go` (1 `os.Exit` site) and `move.go` (3 `os.Exit` sites) are converted to `return ExitError{Code: 1, Err: err}` pattern
+
+**Migration pattern for show.go:**
+```go
+// Before:
+fmt.Fprintln(os.Stderr, "ticket not found")
+os.Exit(1)
+
+// After:
+fmt.Fprintln(os.Stderr, "ticket not found")
+return ExitError{Code: 1, Err: fmt.Errorf("ticket not found")}
+```
+
+---
+
+### cmd/clinban — GOCOVERDIR wiring (T-2)
+
+**Files:**
+- `cmd/clinban/main_test.go` or equivalent TestMain file — add `-cover` build flag and `GOCOVERDIR` env var to subprocess invocations
+
+**Key types / functions:**
+
+| Name | Signature | Responsibility |
+|------|-----------|---------------|
+| `TestMain` | `(m *testing.M)` | Build the test binary with `-cover`; set `GOCOVERDIR` when spawning subprocess tests |
+
+**Interface contract:**
+- `GOCOVERDIR` must point to a directory that exists for the duration of the test run
+- Coverage from subprocess execution is aggregated into the same coverage report as in-process tests
+- No individual test function signatures change
+
+---
+
+### cmd/clinban — list.go (Q-4)
+
+**Files:**
+- `cmd/clinban/list.go` — fix `formatRecord` to use `utf8.RuneCountInString(prefix)` instead of `len(prefix)`
+
+**Key types / functions:**
+
+| Name | Signature | Responsibility |
+|------|-----------|---------------|
+| `formatRecord` | `(r store.Record, width int) → string` | Format one ticket row for terminal display; after fix, prefix length is computed in runes not bytes |
+
+**Interface contract:**
+- Accepts: a `store.Record` and terminal width in columns
+- Returns: a string of at most `width` runes
+- Change: line 165 `prefixLen := len(prefix)` becomes `prefixLen := utf8.RuneCountInString(prefix)`; add `"unicode/utf8"` to imports
+
+---
+
+### go.mod (Q-1)
+
+**Files:**
+- `go.mod` — promote direct dependencies from `// indirect` to direct
+
+**Interface contract:**
+- After `go mod tidy`: `github.com/BurntSushi/toml`, `github.com/spf13/cobra`, `golang.org/x/term`, and `gopkg.in/yaml.v3` appear without `// indirect`
+- `github.com/inconshreveable/mousetrap`, `github.com/spf13/pflag`, and `golang.org/x/sys` remain `// indirect`
+- CI guard command: `go mod tidy && git diff --exit-code go.mod go.sum`
+
+---
+
+## Inter-Component Communication
 
 | From | To | Method | Data |
 |------|----|--------|------|
-| `runInit` | filesystem | `os.Mkdir` | Creates `tickets/` directory at `absTickets` |
-| `runInit` | filesystem | `os.Mkdir` | Creates `tickets/archive/` directory at `absArchive` |
-| `runInit` | filesystem | `os.WriteFile` | Writes `.clinban` TOML at `absConfig` with relative `tickets_dir` and `archive_dir` values; mode `0o600` |
-| `runInit` | stdout | `fmt.Fprintln` | `"created: <relative-name>"` for each artifact created |
-| `runInit` | stderr | `fmt.Fprintln` | `"already exists: <name>"` for each conflicting artifact (no-force path) |
-| `runInit` | stderr | `fmt.Fprintln` | `"re-run with --force to create missing items"` (no-force conflict hint) |
-| `runInit` | stderr | `fmt.Fprintln` | `"already fully initialized"` (force + all-exist path) |
-| `config.Load` | caller | return `*Config` | Returns `TicketsDir = projectRoot/tickets`, `ArchiveDir = projectRoot/tickets/archive` when `.clinban` is absent |
-| `setupWorkDir` | test callers | return `(root, ticketsDir, archiveDir string)` | All three paths exist on disk; `ticketsDir = root/tickets`, `archiveDir = root/tickets/archive` |
+| `cmd/clinban/root.go Execute()` | `cmd/clinban/exit.go ExitError` | `errors.As` check | `ExitError{Code, Err}` |
+| `cmd/clinban/show.go runShow` | `ExitError` | return value | exit code 1 + wrapped error |
+| `cmd/clinban/move.go runMove` | `ExitError` | return value | exit code 1 + wrapped error |
+| `internal/lint Run()` | `ruleRequiredFields` | direct function call | `*ticket.Ticket`, filename, allIDs |
+| `internal/store WriteTicket` | OS filesystem | syscall | `tmp.Sync()`, parent dir `Sync()` |
+| `internal/store MoveToArchive/MoveToActive` | OS filesystem | syscall | `os.Link`, `os.Remove` |
 
 ---
 
 ## Test Strategy
 
 **Unit tests (per module):**
-- `internal/config`: `TestLoad_AbsentFile`, `TestLoad_EmptyTOML` — assert new default paths `tickets/` and `tickets/archive/`
-- `internal/config`: `TestLoad_PartialConfig_ArchiveDirOnly` — assert `TicketsDir` defaults to `dir/tickets`
-- `internal/config`: all other existing tests remain unchanged
+- `internal/store`: existing tests cover `WriteTicket`; add `TestMoveToArchiveRefusesExistingDestination` and `TestMoveToActiveRefusesExistingDestination` to pin D-2 fix
+- `internal/lint`: update existing zero-timestamp test to assert exactly one error per field; verify `ruleTimestampsNonZero` is gone
+- `internal/slug`: add `TestSlugifyAllNonASCII` asserting `Slugify("你好世界") == "ticket"`
+- `internal/editor`: 3 new test functions in `editor_test.go`
+- `internal/template`: 2 new test functions in `template_test.go`
+- `cmd/clinban`: existing subprocess tests remain; add GOCOVERDIR wiring
 
-**Critical paths (must pass before first ship):**
-1. `clinban init` in a fresh directory creates all three artifacts and exits 0 (`TestInitFreshDirectory`)
-2. `clinban init` with existing artifacts and no `--force` exits 1 and names each conflict on stderr (`TestInitAlreadyExists_NoForce`)
-3. `clinban init --force` on a partially initialised directory creates only missing artifacts and exits 0 (`TestInitPartial_DirsExist_NoConfig_Force`, `TestInitPartial_ConfigExists_NoDirs_Force`)
+**Critical paths (must be tested before first ship):**
+1. `store.MoveToArchive` and `store.MoveToActive` with a pre-existing destination file — `TestMoveToArchiveRefusesExistingDestination` and `TestMoveToActiveRefusesExistingDestination` must pass and demonstrate `os.Link`-based atomicity
+2. `lint.Run` on a ticket with zero `Created` and `Updated` — after rule merge, exactly one `LintError` per field (not two); message is `"zero timestamp; value was not parseable as RFC3339"`
+3. `editor.Open` with `EDITOR=/bin/true` returns `nil`; with `EDITOR=/bin/false` returns a non-nil error containing `"exit status"`
 
 **Integration tests:**
-- All five `init_test.go` tests run the compiled binary against a temp filesystem, exercising the full CLI path including flag parsing, PersistentPreRun bypass, and artifact creation
-- All migrated tests in `cmd/clinban/` (list, lint, new, move, show, archive, edit, register) must pass with the new `setupWorkDir` layout, confirming that other commands work correctly under the new default directory structure
+- Existing `cmd/clinban` subprocess tests cover end-to-end command behavior; no new integration tests required beyond GOCOVERDIR wiring to make coverage metrics accurate
 
 ---
 
-## Open Questions Resolved
+## Resolved Architecture Questions
 
-| Question (from 02_architecture.md) | Decision | Rationale |
-|------------------------------------|----------|-----------|
-| Should `--tickets-dir` / `--archive-dir` flags be validated to stay within CWD, or is an absolute path outside CWD acceptable? | No containment check. Absolute paths are treated as user-intentional. | Adds implementation complexity with minimal safety gain at this stage; absolute paths are an advanced user choice. |
-| Should `init` write relative or absolute paths into `.clinban`? | Always write the relative (flag) values into `.clinban`. | Relative paths are portable across machines and user home directories; idiomatic for dotfile configs. |
-| Should a failed `mkdir` after `.clinban` is written trigger cleanup / rollback? | No rollback. Document "re-run with `--force`" as the recovery path. | Rollback adds complexity; `--force` partial-creation already handles the repair case cleanly. |
+| Question (from audit) | Decision | Rationale |
+|-----------------------|----------|-----------|
+| Use `os.Link`+`os.Remove` vs `unix.Renameat2(RENAME_NOREPLACE)` for atomic move | `os.Link`+`os.Remove` | POSIX-standard, no CGo, no build constraints needed; `Renameat2` is Linux-only |
+| Merge D-3 timestamp rule into rule 1 or add a skip guard in rule 5 | Delete rule 5, emit precise message from rule 1 | One rule, one message per field; simpler, eliminates the duplicate entirely |
+| ExitError scope — migrate all 22 `os.Exit` sites now or incrementally | Incremental: `show.go` (1 site) and `move.go` (3 sites) in this sprint | Reduces risk; remaining commands can be migrated per subsequent sprint |
+| GOCOVERDIR wiring location | `TestMain` in `cmd/clinban` test package | Go 1.20+ standard pattern; no individual test changes required |
