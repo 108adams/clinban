@@ -3,7 +3,6 @@ package lint
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"clinban/internal/ticket"
 )
@@ -26,10 +25,10 @@ func ruleRequiredFields(t *ticket.Ticket, filename string, _ []string) []LintErr
 		errs = append(errs, LintError{File: filename, Field: "type", Message: "required field missing"})
 	}
 	if t.Created.IsZero() {
-		errs = append(errs, LintError{File: filename, Field: "created", Message: "required field missing"})
+		errs = append(errs, LintError{File: filename, Field: "created", Message: "zero timestamp; value was not parseable as RFC3339"})
 	}
 	if t.Updated.IsZero() {
-		errs = append(errs, LintError{File: filename, Field: "updated", Message: "required field missing"})
+		errs = append(errs, LintError{File: filename, Field: "updated", Message: "zero timestamp; value was not parseable as RFC3339"})
 	}
 
 	return errs
@@ -91,32 +90,6 @@ func leadingDigits(s string) string {
 		i++
 	}
 	return s[:i]
-}
-
-// ruleTimestampsNonZero checks that created and updated are non-zero time.Time values.
-// Rule 5: zero values indicate an unparseable source string.
-// Only checks fields that were not already flagged by rule 1 as missing.
-func ruleTimestampsNonZero(t *ticket.Ticket, filename string, _ []string) []LintError {
-	var errs []LintError
-
-	// Rule 1 catches the zero case when the field is "missing"; here we provide
-	// the more precise timestamp-specific message for any zero value.
-	if t.Created == (time.Time{}) {
-		errs = append(errs, LintError{
-			File:    filename,
-			Field:   "created",
-			Message: "zero timestamp; value was not parseable as RFC3339",
-		})
-	}
-	if t.Updated == (time.Time{}) {
-		errs = append(errs, LintError{
-			File:    filename,
-			Field:   "updated",
-			Message: "zero timestamp; value was not parseable as RFC3339",
-		})
-	}
-
-	return errs
 }
 
 // ruleTagsNonEmpty checks that every element in the tags list is a non-empty string.

@@ -315,10 +315,11 @@ func TestRule4IDMatchesFilename(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// TestRule5TimestampsNonZero — zero time.Time triggers an error.
+// TestRule1TimestampZeroValue — zero time.Time triggers an error from rule 1
+// (ruleRequiredFields); the message is the precise RFC3339 parse failure text.
 // --------------------------------------------------------------------------
 
-func TestRule5TimestampsNonZero(t *testing.T) {
+func TestRule1TimestampZeroValue(t *testing.T) {
 	t.Parallel()
 
 	t.Run("zero created", func(t *testing.T) {
@@ -460,7 +461,59 @@ func TestLintMissingTitleAndDuplicateID(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// TestLintAllRulesOrdered — smoke test: all 7 rules run and produce errors for
+// TestZeroTimestampExactlyOneErrorPerField — done-criteria: a ticket with zero
+// Created and Updated must produce exactly one LintError per field, with
+// message "zero timestamp; value was not parseable as RFC3339".
+// --------------------------------------------------------------------------
+
+func TestZeroTimestampExactlyOneErrorPerField(t *testing.T) {
+	t.Parallel()
+
+	const wantMsg = "zero timestamp; value was not parseable as RFC3339"
+
+	tests := []struct {
+		name      string
+		mutate    func(*ticket.Ticket)
+		wantField string
+	}{
+		{
+			name:      "zero created produces exactly one error",
+			mutate:    func(tk *ticket.Ticket) { tk.Created = time.Time{} },
+			wantField: "created",
+		},
+		{
+			name:      "zero updated produces exactly one error",
+			mutate:    func(tk *ticket.Ticket) { tk.Updated = time.Time{} },
+			wantField: "updated",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tk := validTicket()
+			tc.mutate(tk)
+			errs := lint.Lint(tk, testFilename, uniqueIDs())
+
+			// Count errors for the target field.
+			var fieldErrs []lint.LintError
+			for _, e := range errs {
+				if e.Field == tc.wantField {
+					fieldErrs = append(fieldErrs, e)
+				}
+			}
+			if len(fieldErrs) != 1 {
+				t.Fatalf("expected exactly 1 error for field %q, got %d: %v", tc.wantField, len(fieldErrs), fieldErrs)
+			}
+			if fieldErrs[0].Message != wantMsg {
+				t.Errorf("error message = %q, want %q", fieldErrs[0].Message, wantMsg)
+			}
+		})
+	}
+}
+
+// --------------------------------------------------------------------------
+// TestLintAllRulesOrdered — smoke test: all rules run and produce errors for
 // a maximally broken ticket.
 // --------------------------------------------------------------------------
 
@@ -471,7 +524,7 @@ func TestLintAllRulesOrdered(t *testing.T) {
 		// Status is invalid → rules 1 (status required) + 2 (invalid status)
 		// Type is invalid → rules 1 (type required) + 3 (invalid type)
 		// Title is empty → rule 1 (title required)
-		// Created/Updated are zero → rules 1 + 5
+		// Created/Updated are zero → rule 1 (timestamp message)
 		// Tags has empty element → rule 6
 		Tags: []string{""},
 	}

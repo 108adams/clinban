@@ -31,15 +31,14 @@ func (e LintError) Error() string {
 // ruleFunc is the signature shared by all rule functions.
 type ruleFunc func(t *ticket.Ticket, filename string, allIDs []string) []LintError
 
-// rules is the ordered list of all 7 lint rules.
+// rules is the ordered list of all 6 lint rules.
 var rules = []ruleFunc{
 	ruleRequiredFields,    // 1
 	ruleValidStatus,       // 2
 	ruleValidType,         // 3
 	ruleIDMatchesFilename, // 4
-	ruleTimestampsNonZero, // 5
-	ruleTagsNonEmpty,      // 6
-	ruleIDUnique,          // 7
+	ruleTagsNonEmpty,      // 5
+	ruleIDUnique,          // 6
 }
 
 // Lint runs all schema rules against t and returns every violation found.
