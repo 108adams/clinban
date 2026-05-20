@@ -1,7 +1,17 @@
 GOCACHE ?= /tmp/clinban-gocache
 export GOCACHE
 
-.PHONY: build install test vet fmt check clean
+.PHONY: help build install test vet fmt check clean
+
+help:
+	@echo "Available targets:"
+	@echo "  build    build ./clinban binary"
+	@echo "  install  install to \$$GOPATH/bin"
+	@echo "  test     go test ./..."
+	@echo "  vet      go vet ./..."
+	@echo "  fmt      gofmt all Go files in place"
+	@echo "  check    vet + test"
+	@echo "  clean    remove local ./clinban binary"
 
 build:
 	go build -o clinban ./cmd/clinban
