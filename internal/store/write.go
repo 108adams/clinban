@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 // ReadTicket reads path and parses it as a Clinban ticket.

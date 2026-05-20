@@ -3,8 +3,8 @@ package store
 import (
 	"errors"
 
-	"clinban/internal/config"
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/config"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 // ErrNotFound is returned by FindByID when no active or archived ticket file

@@ -85,10 +85,16 @@ go version
 
 If Go is not installed, follow the instructions at [go.dev/doc/install](https://go.dev/doc/install).
 
-### Clone and install
+### Install via go install
 
 ```bash
-git clone https://gitlab.com/108adams/clinban.git
+go install github.com/108adams/clinban/cmd/clinban@latest
+```
+
+### Or clone and install
+
+```bash
+git clone https://github.com/108adams/clinban.git
 cd clinban
 go install ./cmd/clinban
 ```
@@ -151,8 +157,8 @@ go vet ./...
 If the Go build cache is read-only in a sandbox, use:
 
 ```bash
-GOCACHE=/tmp/go-trello-gocache go test ./...
-GOCACHE=/tmp/go-trello-gocache go vet ./...
+GOCACHE=/tmp/clinban-gocache go test ./...
+GOCACHE=/tmp/clinban-gocache go vet ./...
 ```
 
 ## Created With Human and LLM Collaboration

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"clinban/internal/config"
+	"github.com/108adams/clinban/internal/config"
 )
 
 const (

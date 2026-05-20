@@ -11,8 +11,8 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"clinban/internal/store"
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/store"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 // statusOrder defines the list display order. Lower values sort earlier.

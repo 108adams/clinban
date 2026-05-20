@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 // ruleRequiredFields checks that all required fields are non-zero.

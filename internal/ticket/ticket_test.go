@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 // ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@ package slug_test
 import (
 	"testing"
 
-	"clinban/internal/slug"
+	"github.com/108adams/clinban/internal/slug"
 )
 
 // Done-criteria constants from the task spec.

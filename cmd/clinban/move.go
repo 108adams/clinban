@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"clinban/internal/fsm"
-	"clinban/internal/store"
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/fsm"
+	"github.com/108adams/clinban/internal/store"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 var moveCmd = &cobra.Command{

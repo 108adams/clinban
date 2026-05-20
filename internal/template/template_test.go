@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"clinban/internal/template"
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/template"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 const testID = 42

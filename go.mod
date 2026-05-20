@@ -1,4 +1,4 @@
-module clinban
+module github.com/108adams/clinban
 
 go 1.25.0
 

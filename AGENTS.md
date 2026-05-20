@@ -74,22 +74,22 @@ In this workspace, use a writable Go build cache by default. The normal cache
 may be read-only in sandboxed sessions.
 
 ```bash
-export GOCACHE=/tmp/go-trello-gocache
+export GOCACHE=/tmp/clinban-gocache
 ```
 
 Run before handing work back:
 
 ```bash
 gofmt -w <changed-go-files>
-GOCACHE=/tmp/go-trello-gocache go test ./...
-GOCACHE=/tmp/go-trello-gocache go vet ./...
+GOCACHE=/tmp/clinban-gocache go test ./...
+GOCACHE=/tmp/clinban-gocache go vet ./...
 ```
 
 Use the same cache setting for other Go commands:
 
 ```bash
-GOCACHE=/tmp/go-trello-gocache go run ./cmd/clinban --help
-GOCACHE=/tmp/go-trello-gocache go doc ./internal/ticket
+GOCACHE=/tmp/clinban-gocache go run ./cmd/clinban --help
+GOCACHE=/tmp/clinban-gocache go doc ./internal/ticket
 ```
 
 For docs-only changes, still consider running `go test ./...` if code comments or generated documentation paths changed.

@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"clinban/internal/config"
-	"clinban/internal/store"
+	"github.com/108adams/clinban/internal/config"
+	"github.com/108adams/clinban/internal/store"
 )
 
 // st is the package-level Store used by all subcommands. It is initialised by

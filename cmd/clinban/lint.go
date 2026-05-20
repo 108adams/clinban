@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"clinban/internal/lint"
-	"clinban/internal/store"
+	"github.com/108adams/clinban/internal/lint"
+	"github.com/108adams/clinban/internal/store"
 )
 
 var lintCmd = &cobra.Command{

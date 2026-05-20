@@ -19,13 +19,13 @@ The `superpowers:brainstorming` skill must run before any feature work. `/dev` i
 
 1. Read the relevant `docs/` pages before touching code (see AGENTS.md §Start Here).
 2. Use `/dev` to pick up a task from `pipeline/04_tasks.md` if it exists.
-3. Follow AGENTS.md §Validation Commands — always set `GOCACHE=/tmp/go-trello-gocache`.
+3. Follow AGENTS.md §Validation Commands — always set `GOCACHE=/tmp/clinban-gocache`.
 4. Commit after each completed ticket/task.
 
 ## Go Commands
 
 ```bash
-export GOCACHE=/tmp/go-trello-gocache
+export GOCACHE=/tmp/clinban-gocache
 go test ./...
 go vet ./...
 gofmt -w <changed-files>

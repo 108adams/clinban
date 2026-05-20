@@ -3,7 +3,7 @@ package lint
 import (
 	"fmt"
 
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 // LintError is a single schema violation found in a ticket file.

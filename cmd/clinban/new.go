@@ -10,11 +10,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"clinban/internal/editor"
-	"clinban/internal/lint"
-	"clinban/internal/slug"
-	"clinban/internal/template"
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/editor"
+	"github.com/108adams/clinban/internal/lint"
+	"github.com/108adams/clinban/internal/slug"
+	"github.com/108adams/clinban/internal/template"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 // newFlags holds the parsed flag values for the new subcommand.

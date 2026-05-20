@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"clinban/internal/editor"
+	"github.com/108adams/clinban/internal/editor"
 )
 
 func TestEditorSuccess(t *testing.T) {

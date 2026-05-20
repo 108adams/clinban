@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"clinban/internal/lint"
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/lint"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 // --------------------------------------------------------------------------

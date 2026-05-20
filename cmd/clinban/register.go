@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"clinban/internal/lint"
-	"clinban/internal/slug"
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/lint"
+	"github.com/108adams/clinban/internal/slug"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 var registerCmd = &cobra.Command{

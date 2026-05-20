@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"clinban/internal/config"
-	"clinban/internal/store"
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/config"
+	"github.com/108adams/clinban/internal/store"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 // ---- constants ----

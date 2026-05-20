@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 // transitions maps each Status to the set of statuses it may legally move to.

@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"clinban/internal/store"
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/store"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 var archiveCmd = &cobra.Command{

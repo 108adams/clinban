@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"clinban/internal/fsm"
-	"clinban/internal/ticket"
+	"github.com/108adams/clinban/internal/fsm"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 // validTransitionCases lists every transition that must return nil.
