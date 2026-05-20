@@ -1,3 +1,8 @@
-.claude/
+# AI tool directories: skills, agents, and definitions are tracked.
+# Only local-machine config is excluded.
+.claude/settings.local.json
+.codex/settings.local.json
+.agents/settings.local.json
+
 /clinban
 /clinban.test
