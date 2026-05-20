@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -162,7 +163,7 @@ func formatRecord(r store.Record, width int) string {
 	prefix := id + "  " + status + "  " + typ + "  "
 
 	// Calculate how many runes are available for the title.
-	prefixLen := len(prefix)
+	prefixLen := utf8.RuneCountInString(prefix)
 	available := width - prefixLen
 	if available <= 0 {
 		// No room for title at all — still emit the prefix.
