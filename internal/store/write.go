@@ -53,6 +53,11 @@ func (s *Store) WriteTicket(t *ticket.Ticket, path string) error {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("store: write ticket: chmod temp: %w", err)
 	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("store: write ticket: sync temp: %w", err)
+	}
 	if err := tmp.Close(); err != nil {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("store: write ticket: close temp: %w", err)
@@ -61,6 +66,10 @@ func (s *Store) WriteTicket(t *ticket.Ticket, path string) error {
 	if err := os.Rename(tmpPath, path); err != nil {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("store: write ticket: rename: %w", err)
+	}
+	if dir, err := os.Open(filepath.Dir(path)); err == nil {
+		_ = dir.Sync()
+		_ = dir.Close()
 	}
 	return nil
 }
