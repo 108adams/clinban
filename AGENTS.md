@@ -16,18 +16,29 @@ Read these first, in order:
 6. `docs/validation.md` - parse, lint, and FSM rules.
 7. `docs/storage.md` and `docs/security.md` - filesystem behavior and trust model.
 
-The `docs/` wiki is the maintained source of truth. Do not resurrect `pipeline/` planning files; that directory was intentionally emptied after migration.
+The `docs/` wiki is the maintained long-lived source of truth.
+
+The `pipeline/` directory is task-scoped working context for agents. Files there
+may contain temporary specs, designs, task breakdowns, reviews, and audit notes
+for the current piece of work. It is valid to commit those artifacts with the
+code they guided when they are useful context for the task. Clean up or replace
+stale `pipeline/` files when starting a new unrelated task, but do not treat
+their mere presence as a quality issue. Durable project knowledge should still
+be migrated into `docs/`, not left only in `pipeline/`.
 
 ## Project Shape
 
 Important packages:
 
-- `cmd/clinban`: Cobra CLI commands and user-facing behavior.
+- `cmd/clinban`: Cobra CLI commands and user-facing behavior (`init`, `new`,
+  `list`, `show`, `edit`, `move`, `push`, `archive`, `register`, `lint`, and
+  Cobra `completion`).
 - `internal/ticket`: ticket schema, status/type constants, parse/marshal.
 - `internal/store`: filesystem storage, ID scanning, atomic writes, active/archive moves.
 - `internal/lint`: schema validation for parsed tickets.
 - `internal/fsm`: status transition rules.
-- `internal/config`: `.clinban` loading and path resolution.
+- `internal/config`: `.clinban` loading, path resolution, and config defaults
+  such as `default_type`.
 - `internal/editor`: `$EDITOR` invocation.
 - `internal/slug`: title-to-filename slug generation.
 - `internal/template`: embedded interactive ticket template.
@@ -49,6 +60,9 @@ Respect the package boundaries:
 - For file writes, preserve the same-directory temp-file plus rename pattern.
 - Do not overwrite archive/active destination files silently.
 - Treat `$EDITOR` as user-controlled environment state; do not try to sandbox it inside Clinban.
+- Keep `cmd/clinban/schema.md` aligned with behavior that affects LLM/agent
+  ticket operations; `clinban init` embeds it as the generated project-level
+  `SCHEMA.md`.
 
 ## Documentation Rules
 
@@ -63,8 +77,10 @@ When behavior changes:
 2. Update tests.
 3. Update Go doc comments if exported behavior changed.
 4. Update the relevant `docs/` page.
-5. Update `docs/index.md` if pages were added, removed, renamed, or repurposed.
-6. Append a short entry to `docs/log.md`.
+5. Update `cmd/clinban/schema.md` if the change affects generated `SCHEMA.md`
+   guidance for humans or agents.
+6. Update `docs/index.md` if pages were added, removed, renamed, or repurposed.
+7. Append a short entry to `docs/log.md`.
 
 Use the `librarian` Codex skill for documentation wiki work when available. The wiki schema is in `docs/schema.md`.
 
@@ -104,6 +120,8 @@ When reviewing or implementing, prioritize:
 - Compatibility with the documented ticket schema.
 - Tests that exercise command behavior through realistic filesystem fixtures.
 - Documentation alignment with current behavior.
+- Whether any `pipeline/` artifacts are stale for the current task. Do not flag
+  `pipeline/` files solely because they are present or committed.
 
 ## Working Tree Hygiene
 
