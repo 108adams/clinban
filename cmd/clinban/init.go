@@ -1,12 +1,16 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
+
+//go:embed schema.md
+var schemaMD string
 
 type initFlags struct {
 	ticketsDir string
@@ -63,17 +67,21 @@ func runInit(flags initFlags) error {
 	}
 	absConfig := filepath.Join(cwd, ".clinban")
 
-	// Step 4: pre-flight — stat all three and record existence.
+	// Step 4: pre-flight — stat all four and record existence.
+	absSchema := filepath.Join(cwd, "SCHEMA.md")
+
 	_, errTickets := os.Stat(absTickets)
 	ticketsExists := errTickets == nil
 	_, errArchive := os.Stat(absArchive)
 	archiveExists := errArchive == nil
 	_, errConfig := os.Stat(absConfig)
 	configExists := errConfig == nil
+	_, errSchema := os.Stat(absSchema)
+	schemaExists := errSchema == nil
 
 	// Step 5: without --force, fail if any artifact exists.
 	if !flags.force {
-		if ticketsExists || archiveExists || configExists {
+		if ticketsExists || archiveExists || configExists || schemaExists {
 			if ticketsExists {
 				fmt.Fprintln(os.Stderr, "already exists: tickets/")
 			}
@@ -83,13 +91,16 @@ func runInit(flags initFlags) error {
 			if configExists {
 				fmt.Fprintln(os.Stderr, "already exists: .clinban")
 			}
+			if schemaExists {
+				fmt.Fprintln(os.Stderr, "already exists: SCHEMA.md")
+			}
 			fmt.Fprintln(os.Stderr, "re-run with --force to create missing items")
 			return fmt.Errorf("init: project already partially or fully initialized")
 		}
 	}
 
 	// Step 6: with --force, fail if all artifacts exist.
-	if flags.force && ticketsExists && archiveExists && configExists {
+	if flags.force && ticketsExists && archiveExists && configExists && schemaExists {
 		fmt.Fprintln(os.Stderr, "already fully initialized")
 		return fmt.Errorf("init: already fully initialized")
 	}
@@ -115,6 +126,13 @@ func runInit(flags initFlags) error {
 			return fmt.Errorf("init: write config: %w", err)
 		}
 		fmt.Println("created: .clinban")
+	}
+
+	if !schemaExists {
+		if err := os.WriteFile(absSchema, []byte(schemaMD), 0o644); err != nil {
+			return fmt.Errorf("init: write schema: %w", err)
+		}
+		fmt.Println("created: SCHEMA.md")
 	}
 
 	return nil

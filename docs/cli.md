@@ -3,7 +3,7 @@ title: CLI Reference
 kind: reference
 scope: cli
 summary: Documents Clinban commands, expected outputs, and exit-code conventions.
-updated: 2026-05-19
+updated: 2026-05-21
 links:
   - ticket-schema
   - configuration
@@ -19,11 +19,12 @@ Normal output goes to stdout. User-facing errors go to stderr, except lint viola
 
 ## `clinban init`
 
-Initializes a Clinban project in the current directory by creating three artifacts:
+Initializes a Clinban project in the current directory by creating four artifacts:
 
 - `tickets/` — active ticket directory
 - `tickets/archive/` — archive directory
 - `.clinban` — TOML configuration file
+- `SCHEMA.md` — human/LLM-readable reference for the ticket format, field constraints, status transitions, and agent operations
 
 Each created artifact is reported on stdout (`created: tickets/`, etc.). If any artifact already exists, the command exits `1` and lists each conflict on stderr.
 

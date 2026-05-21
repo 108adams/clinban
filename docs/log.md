@@ -3,7 +3,7 @@ title: Documentation Log
 kind: log
 scope: docs
 summary: Records chronological maintenance activity for the Clinban documentation wiki.
-updated: 2026-05-20
+updated: 2026-05-21
 links:
   - index
   - schema
@@ -48,6 +48,12 @@ links:
 - Source: Cobra-generated `clinban completion --help`
 - Updated: `docs/cli.md`, `docs/log.md`
 - Notes: Documented shell completion generation for bash, zsh, fish, and powershell.
+
+## [2026-05-21] feature | clinban init emits SCHEMA.md (ticket 0001)
+
+- Source: `cmd/clinban/schema.md`, `cmd/clinban/init.go`, `cmd/clinban/init_test.go`
+- Updated: `docs/cli.md`, `docs/log.md`
+- Notes: `clinban init` now creates a fourth artifact, `SCHEMA.md`, at the project root. The file is a static Markdown schema reference for LLM agents and human contributors; it covers ticket format, field constraints, status transitions, and step-by-step agent operations.
 
 ## [2026-05-20] update | GitHub migration — module path and CI
 
