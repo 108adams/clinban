@@ -1,77 +1,70 @@
 # Developer Tasks
-_Produced by: techlead-agent_
-_Date: 2026-05-20_
+_Produced by: techlead (inline)_
+_Date: 2026-05-21_
 _Status: draft_
 _Input: pipeline/03_design.md_
 
 ## Task List
 
-### TASK-001: Write cmd/clinban/schema.md
-- **Description:** Create the static Markdown reference document at `cmd/clinban/schema.md`. This file is the content that `clinban init` will embed and write to the project root as `SCHEMA.md`. It must be complete and accurate because it is the primary interface between the tool and LLM agents.
-- **Module(s):** `cmd/clinban/schema.md` (new file)
+### TASK-001: Add DefaultType to internal/config
+
+- **Description:** Add `DefaultType string` to `Config` and parse `default_type` from the `.clinban` TOML file.
+- **Module(s):** `internal/config/config.go`, `internal/config/config_test.go`
 - **Done criteria:**
-  - [ ] File exists at `cmd/clinban/schema.md`
-  - [ ] Section 1 — Intro: explains what Clinban is and instructs the reader to check `.clinban` for the values of `tickets_dir` and `archive_dir`
-  - [ ] Section 2 — Ticket format: includes a complete YAML frontmatter example with all seven fields
-  - [ ] Section 3 — Fields table: covers `id`, `status`, `type`, `title`, `tags`, `created`, `updated`; each row states required/optional, owner (tool vs human vs agent), and constraints (e.g. RFC3339 for timestamps, zero-padded 4-digit for id)
-  - [ ] Section 4 — File naming: documents the `<id>-<slug>.md` convention
-  - [ ] Section 5 — Status transitions: lists all five valid transitions (`backlog→in-progress`, `in-progress→blocked`, `in-progress→done`, `blocked→in-progress`, `done→backlog`)
-  - [ ] Section 6 — Agent operations: step-by-step instructions for create a ticket, update a ticket, move status, archive
-  - [ ] Valid Markdown; no Go changes in this task
+  - [ ] `Config` struct has `DefaultType string \`toml:"default_type"\`` field
+  - [ ] `raw` struct in `Load` has `DefaultType string \`toml:"default_type"\`` field
+  - [ ] `cfg.DefaultType` is set from `raw.DefaultType` (no validation)
+  - [ ] Existing config tests still pass
+  - [ ] New test: `.clinban` with `default_type = "feature"` → `cfg.DefaultType == "feature"`
+  - [ ] New test: `.clinban` without `default_type` → `cfg.DefaultType == ""`
+  - [ ] `go test ./internal/config/...` passes
+  - [ ] `go vet ./internal/config/...` clean
 - **Depends on:** none
-- **Notes:** Write for an LLM reader that has no prior context. Keep instructions imperative and unambiguous. The file is embedded verbatim — no templating.
 
 ---
 
-### TASK-002: Update runInit to emit SCHEMA.md
-- **Description:** Wire `cmd/clinban/schema.md` into `init.go` using `//go:embed`. Extend `runInit` to stat, guard, and create `SCHEMA.md` as a fourth artifact alongside the existing three.
-- **Module(s):** `cmd/clinban/init.go`
+### TASK-002: Update internal/template to accept and render default type
+
+- **Description:** Add `Type string` to `templateData`, add `defaultType string` as third param to `New`, and update `new.md` to render the type field.
+- **Module(s):** `internal/template/template.go`, `internal/template/new.md`, `internal/template/template_test.go`
 - **Done criteria:**
-  - [ ] `//go:embed schema.md` directive present; `var schemaMD string` declared at package level
-  - [ ] Step 4: `absSchema` and `schemaExists` computed from `filepath.Join(cwd, "SCHEMA.md")`
-  - [ ] Step 5 (no-force check): `schemaExists` included; prints `"already exists: SCHEMA.md"` to stderr when true
-  - [ ] Step 6 (force full-init guard): condition requires all four — `ticketsExists && archiveExists && configExists && schemaExists`
-  - [ ] Step 7: `if !schemaExists` branch calls `os.WriteFile(absSchema, []byte(schemaMD), 0o644)` and prints `"created: SCHEMA.md"` to stdout; error wrapped as `"init: write schema: %w"`
-  - [ ] `go build ./cmd/clinban/...` succeeds
-  - [ ] `go vet ./cmd/clinban/...` clean
-- **Depends on:** TASK-001
-- **Notes:** The `//go:embed` directive requires `schema.md` to be in the same directory as the `.go` file. The `import _ "embed"` blank import is required if no other embed is already present in the package.
+  - [ ] `templateData` has `Type string` field
+  - [ ] `New` signature is `(id int, now time.Time, defaultType string) ([]byte, error)`
+  - [ ] `new.md` has `type: "{{.Type}}"` (not `type: ""`)
+  - [ ] `TestNewReturnsParseableTicket` updated to pass `""` as third arg; still passes
+  - [ ] `TestNewContainsIDAndTimestamp` updated to pass `""` as third arg; still passes
+  - [ ] New test `TestNewWithDefaultType`: `New(1, now, "bug")` → bytes contain `type: "bug"`
+  - [ ] `go test ./internal/template/...` passes
+  - [ ] `go vet ./internal/template/...` clean
+- **Depends on:** none (config and template are independent)
+- **Notes:** `new.md` change: `type: ""` → `type: "{{.Type}}"`. When `defaultType` is `""` the rendered output is `type: ""` — identical to current behaviour.
 
 ---
 
-### TASK-003: Update init tests
-- **Description:** Update the four existing `TestInit*` functions in `cmd/clinban/init_test.go` to account for the fourth artifact, and add the new `TestInitPartial_SchemaOnly_Force` test.
-- **Module(s):** `cmd/clinban/init_test.go`
+### TASK-003: Wire default type into cmd/clinban/new.go
+
+- **Description:** Pass `cfg.DefaultType` to `template.New` in the interactive path, and use it as a fallback for `--type` in the non-interactive path.
+- **Module(s):** `cmd/clinban/new.go`, `cmd/clinban/new_test.go`
 - **Done criteria:**
-  - [ ] `TestInitFreshDirectory`: stdout contains `"created: SCHEMA.md"`; `os.Stat(filepath.Join(dir, "SCHEMA.md"))` succeeds; file size is greater than zero
-  - [ ] `TestInitAlreadyExists_WithForce`: pre-creates `SCHEMA.md` alongside the other three artifacts before running `--force`; test still exits 1 with "already fully initialized"
-  - [ ] `TestInitPartial_DirsExist_NoConfig_Force`: asserts stdout contains both `"created: .clinban"` and `"created: SCHEMA.md"`
-  - [ ] `TestInitPartial_ConfigExists_NoDirs_Force`: asserts stdout contains `"created: SCHEMA.md"`
-  - [ ] `TestInitPartial_SchemaOnly_Force` (new): pre-creates `tickets/`, `archive/`, `.clinban`; does NOT pre-create `SCHEMA.md`; runs `clinban init --force`; asserts exit 0; asserts stdout contains `"created: SCHEMA.md"`; asserts stdout does NOT contain `"created: tickets"`, `"created: archive"`, or `"created: .clinban"`
+  - [ ] `runNewInteractive`: `template.New(nextID, now, cfg.DefaultType)` (third arg added)
+  - [ ] `runNewNonInteractive`: if `flags.ticketType == ""` and `cfg.DefaultType` is a valid type, set `flags.ticketType = cfg.DefaultType`; otherwise keep existing "error: --type is required" path
+  - [ ] New subprocess test: write `.clinban` with `default_type = "task"`, run `clinban new --no-interactive --title "X"` without `--type` → exits 0, ticket file contains `type: task`
+  - [ ] New subprocess test: no `default_type` in config, run `clinban new --no-interactive --title "X"` without `--type` → exits 1, stderr contains "required"
+  - [ ] New subprocess test: `default_type = "notavalidtype"` in config, run without `--type` → exits 1
+  - [ ] Existing `new` tests still pass
   - [ ] `go test ./cmd/clinban/...` passes
-- **Depends on:** TASK-002
-- **Notes:** Use the existing subprocess harness pattern for `TestInitPartial_SchemaOnly_Force`. The assertion that no other "created:" lines appear is important — it confirms the partial-init logic correctly skips already-present artifacts.
-
----
-
-### TASK-004: Update docs
-- **Description:** Update `docs/cli.md` to list `SCHEMA.md` as a fourth artifact created by `clinban init`, and append a log entry to `docs/log.md`.
-- **Module(s):** `docs/cli.md`, `docs/log.md`
-- **Done criteria:**
-  - [ ] `docs/cli.md` init section lists `SCHEMA.md` as a fourth artifact with a one-line description of its purpose (human/LLM-readable schema reference)
-  - [ ] `docs/log.md` has a new entry for this feature following the existing log entry format
-- **Depends on:** TASK-003
-- **Notes:** Keep the `docs/cli.md` addition concise — one bullet or table row is sufficient. The log entry should reference the ticket ID (0001) and briefly state what changed.
+  - [ ] `go vet ./cmd/clinban/...` clean
+- **Depends on:** TASK-001, TASK-002
 
 ---
 
 ## Dependency Order
 
 ```
-TASK-001 (cmd/clinban/schema.md content)
-    └── TASK-002 (runInit wiring in init.go)
-            └── TASK-003 (init_test.go updates + new test)
-                    └── TASK-004 (docs/cli.md + docs/log.md)
+TASK-001 (internal/config)  ──┐
+                               ├──► TASK-003 (cmd/clinban/new.go)
+TASK-002 (internal/template) ──┘
 ```
 
-Linear sequence. No task depends on more than one predecessor. Each task is under one hour of work.
+TASK-001 and TASK-002 are independent and can be done in either order.
+TASK-003 depends on both.

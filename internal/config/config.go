@@ -22,6 +22,9 @@ type Config struct {
 	TicketsDir string `toml:"tickets_dir"`
 	// ArchiveDir is the directory containing archived ticket files.
 	ArchiveDir string `toml:"archive_dir"`
+	// DefaultType is the ticket type used when --type is not supplied.
+	// Empty string means "not set"; validation is the caller's responsibility.
+	DefaultType string `toml:"default_type"`
 }
 
 // Load reads .clinban from projectRoot and returns the resolved configuration.
@@ -45,8 +48,9 @@ func Load(projectRoot string) (*Config, error) {
 	}
 
 	var raw struct {
-		TicketsDir string `toml:"tickets_dir"`
-		ArchiveDir string `toml:"archive_dir"`
+		TicketsDir  string `toml:"tickets_dir"`
+		ArchiveDir  string `toml:"archive_dir"`
+		DefaultType string `toml:"default_type"`
 	}
 
 	if err := toml.Unmarshal(data, &raw); err != nil {
@@ -65,6 +69,8 @@ func Load(projectRoot string) (*Config, error) {
 	if raw.ArchiveDir != "" {
 		cfg.ArchiveDir = absPath(projectRoot, raw.ArchiveDir)
 	}
+
+	cfg.DefaultType = raw.DefaultType
 
 	return cfg, nil
 }

@@ -1,113 +1,80 @@
 # Implementation Design
-_Produced by: techlead-agent_
-_Date: 2026-05-20_
+_Produced by: techlead (inline)_
+_Date: 2026-05-21_
 _Status: draft_
-_Input: design summary for ticket 0001 (SCHEMA.md for LLM agents)_
+_Input: ticket 0002 — default configurable type_
+
+## Scope note
+
+Small, targeted feature. Three packages touched in a linear dependency chain:
+`internal/config` → `internal/template` → `cmd/clinban/new.go`. No new packages.
+
+---
 
 ## Module Structure
 
-### cmd/clinban/schema.md (new embedded file)
+### internal/config — config.go
 
 **Files:**
-- `cmd/clinban/schema.md` — static Markdown reference document embedded at compile time; written verbatim to `SCHEMA.md` in the project root by `clinban init`
+- `internal/config/config.go` — add `DefaultType string` field; parse `default_type` from TOML
 
 **Key types / functions:**
 
 | Name | Signature | Responsibility |
-|------|-----------|---------------|
-| `schemaMD` | `string` (package-level var) | Holds the embedded content of `schema.md` via `//go:embed`; zero runtime cost |
+|------|-----------|----------------|
+| `Config` | struct | Add `DefaultType string \`toml:"default_type"\`` field |
+| `Load` | `(projectRoot string) → (*Config, error)` | Parse `default_type` from raw TOML into `cfg.DefaultType`; no validation — keep config loading pure |
 
 **Interface contract:**
-- Accepts: N/A — purely static content read at compile time
-- Returns: N/A — consumed as a `string` by `runInit`
-- Errors: none; any embed failure is a compile error, not a runtime error
-
-**Required sections in schema.md:**
-1. Intro — what Clinban is; how to locate `tickets_dir` and `archive_dir` from `.clinban`
-2. Ticket format — complete YAML frontmatter example
-3. Fields table — `id`, `status`, `type`, `title`, `tags`, `created`, `updated`; for each: required/optional, owner, constraints
-4. File naming convention — `<id>-<slug>.md` pattern
-5. Status transitions — `backlog→in-progress`, `in-progress→blocked`, `in-progress→done`, `blocked→in-progress`, `done→backlog`
-6. Agent operations — create a ticket, update a ticket, move status, archive
+- `Config.DefaultType` is the raw string from `.clinban`; empty string when unset
+- No validation at load time; callers validate against `ticket.Type.Valid()`
+- `raw` struct in `Load` gains `DefaultType string \`toml:"default_type"\``
 
 ---
 
-### cmd/clinban/init.go (modified)
+### internal/template — template.go + new.md
 
 **Files:**
-- `cmd/clinban/init.go` — manages creation of four project artifacts; extended to emit `SCHEMA.md`
+- `internal/template/template.go` — add `Type string` to `templateData`; add `defaultType string` parameter to `New`
+- `internal/template/new.md` — change `type: ""` to `type: "{{.Type}}"`
 
 **Key types / functions:**
 
 | Name | Signature | Responsibility |
-|------|-----------|---------------|
-| `runInit` | `(flags initFlags) → error` | Orchestrate creation of tickets dir, archive dir, `.clinban` config, and `SCHEMA.md`; signature unchanged |
-| `schemaMD` | `var schemaMD string` | Package-level embedded string declared in this file |
+|------|-----------|----------------|
+| `templateData` | struct | Add `Type string` field |
+| `New` | `(id int, now time.Time, defaultType string) → ([]byte, error)` | Pass `defaultType` as `templateData.Type`; no validation — caller is responsible |
 
 **Interface contract:**
-- Accepts: `initFlags` struct (unchanged)
-- Returns: `nil` on success; wrapped error on any I/O failure
-- Errors:
-  - `"init: write schema: %w"` — `os.WriteFile` failure when writing `SCHEMA.md`
-  - Existing error prefixes for tickets dir, archive dir, and config are unchanged
-
-**Step-by-step changes to `runInit`:**
-
-Step 4 (pre-flight stat):
-- Add `absSchema := filepath.Join(cwd, "SCHEMA.md")`
-- Add `_, errSchema := os.Stat(absSchema); schemaExists := errSchema == nil`
-
-Step 5 (no-force early-exit check):
-- Include `schemaExists` in the already-initialized guard
-- Print `"already exists: SCHEMA.md"` to stderr when true
-
-Step 6 (force full-init guard):
-- Require all four artifacts to exist before treating the project as "already fully initialized":
-  `ticketsExists && archiveExists && configExists && schemaExists`
-
-Step 7 (creation):
-- Add branch: `if !schemaExists { os.WriteFile(absSchema, []byte(schemaMD), 0o644); print "created: SCHEMA.md" }`
-- Error wrap: `fmt.Errorf("init: write schema: %w", err)`
-- File permissions: `0o644` (world-readable documentation)
-
-**Embed directive (top of file, alongside any existing embed directives):**
-```go
-//go:embed schema.md
-var schemaMD string
-```
+- `New` accepts any `defaultType` string and renders it verbatim into the template
+- Empty string renders as `type: ""` — same behaviour as before for callers that pass `""`
+- Breaking change: all call sites must add the third argument
 
 ---
 
-### cmd/clinban/init_test.go (modified)
+### cmd/clinban — new.go
 
 **Files:**
-- `cmd/clinban/init_test.go` — existing subprocess-based test file; updated and extended
+- `cmd/clinban/new.go` — two sites updated
 
-**Key types / functions:**
+**Changes:**
 
-| Name | Signature | Responsibility |
-|------|-----------|---------------|
-| `TestInitFreshDirectory` | `(t *testing.T)` | Fresh dir: assert all four artifacts created, SCHEMA.md non-empty |
-| `TestInitAlreadyExists_WithForce` | `(t *testing.T)` | All four present: `--force` exits 1 with "already fully initialized" |
-| `TestInitPartial_DirsExist_NoConfig_Force` | `(t *testing.T)` | Dirs exist, no config, no schema: `--force` creates both `.clinban` and `SCHEMA.md` |
-| `TestInitPartial_ConfigExists_NoDirs_Force` | `(t *testing.T)` | Config exists, no dirs, no schema: `--force` creates dirs and `SCHEMA.md` |
-| `TestInitPartial_SchemaOnly_Force` | `(t *testing.T)` | NEW — three artifacts present, no schema: `--force` creates only `SCHEMA.md` |
+1. `runNewInteractive`: pass `cfg.DefaultType` as third arg to `template.New`
 
-**Interface contract (test perspective):**
-- All tests run `clinban init` as a subprocess via the existing test harness
-- `TestInitPartial_SchemaOnly_Force` pre-creates `tickets/`, `archive/`, and `.clinban`; does NOT pre-create `SCHEMA.md`; asserts exit 0 and stdout contains exactly `"created: SCHEMA.md"` with no dir/config creation messages
-
----
-
-### docs/cli.md + docs/log.md (updated)
-
-**Files:**
-- `docs/cli.md` — CLI reference; `init` section updated to list `SCHEMA.md` as fourth artifact
-- `docs/log.md` — append one entry for this feature
-
-**Interface contract:**
-- `docs/cli.md` init section must mention `SCHEMA.md` with a one-line description of its purpose
-- `docs/log.md` entry format follows the existing log convention
+2. `runNewNonInteractive`: after the `flags.ticketType == ""` check, fall back to
+   `cfg.DefaultType` when it holds a valid type:
+   ```go
+   if flags.ticketType == "" {
+       if cfg.DefaultType != "" && ticket.Type(cfg.DefaultType).Valid() {
+           flags.ticketType = cfg.DefaultType
+       } else {
+           fmt.Fprintln(os.Stderr, "error: --type is required")
+           os.Exit(1)
+       }
+   }
+   ```
+   The existing `tt.Valid()` check below remains unchanged — it guards the
+   user-supplied flag value; the default is already validated above.
 
 ---
 
@@ -115,31 +82,30 @@ var schemaMD string
 
 | From | To | Method | Data |
 |------|----|--------|------|
-| `cmd/clinban/init.go runInit` | `cmd/clinban/schema.md` (embedded) | `//go:embed` + `os.WriteFile` | `schemaMD string` → `[]byte` written to `SCHEMA.md` |
-| LLM agent / human | `SCHEMA.md` (project root) | file read at runtime | Markdown text; agent locates dirs via `.clinban` |
+| `cmd/clinban/root.go` PersistentPreRun | `config.Load` | function call | projectRoot string |
+| `cmd/clinban/new.go runNewInteractive` | `template.New` | function call | `cfg.DefaultType` as third arg |
+| `cmd/clinban/new.go runNewNonInteractive` | `ticket.Type.Valid()` | method call | `cfg.DefaultType` validity check |
 
 ---
 
 ## Test Strategy
 
-**Unit tests (per module):**
-- `cmd/clinban`: all init tests via subprocess harness in `init_test.go`
+**Unit (per module):**
+- `internal/config`: add test case for `.clinban` with `default_type = "feature"`; assert `cfg.DefaultType == "feature"`. Test absent field → `cfg.DefaultType == ""`.
+- `internal/template`: update `TestNewReturnsParseableTicket` and `TestNewContainsIDAndTimestamp` to pass `""` as third arg (regression). Add `TestNewWithDefaultType`: pass `"bug"` → rendered bytes contain `type: "bug"`.
+- `cmd/clinban`: subprocess tests for `--no-interactive` without `--type` but with `default_type = "task"` in `.clinban` → ticket created with `type: task`. Also test missing `--type` with no `default_type` → exits 1.
 
-**Critical paths (must be tested before first ship):**
-1. `TestInitFreshDirectory` — `clinban init` on a clean directory creates `SCHEMA.md`, the file exists on disk, and its size is greater than zero
-2. `TestInitAlreadyExists_WithForce` — when all four artifacts are present, `--force` exits 1 with "already fully initialized" (no regression from adding the fourth guard)
-3. `TestInitPartial_SchemaOnly_Force` — when only `SCHEMA.md` is missing, `--force` creates it and prints no other "created:" lines
-
-**Integration tests:**
-- No new integration tests required; the existing subprocess harness in `cmd/clinban` covers end-to-end behavior for all three critical paths above
+**Critical paths:**
+1. `config.Load` with `default_type = "spike"` in `.clinban` → `cfg.DefaultType == "spike"`
+2. `template.New(1, now, "feature")` → rendered bytes contain `type: "feature"`
+3. `clinban new --no-interactive --title "X"` with `default_type = "task"` in config → creates ticket with `type: task`
 
 ---
 
-## Resolved Architecture Questions
+## Resolved Design Questions
 
 | Question | Decision | Rationale |
 |----------|----------|-----------|
-| New package vs embed in existing `cmd/clinban`? | No new package; `//go:embed schema.md` in `init.go` | The schema is a single static file with one consumer; a new package would add indirection with no benefit |
-| Where does the LLM read dir paths from? | LLM reads `.clinban` at runtime | `SCHEMA.md` is static; dynamic paths (tickets dir, archive dir) are in `.clinban` which the agent reads separately |
-| File permissions for `SCHEMA.md`? | `0o644` | Documentation file; world-readable is appropriate and consistent with other static project files |
-| Scope: is `schema.md` content defined in this sprint? | Yes — content is part of TASK-001 and must include all six required sections | The document has no value if it is empty or incomplete at ship time |
+| Validate `default_type` at config load? | No — load raw, validate at use | Keeps config loading pure; invalid value is simply ignored (falls through to the "type required" error) |
+| Make `--type` optional for `--no-interactive` when default set? | Yes | "Pre-filled" applies to both paths; non-interactive should be unblocked by a valid default |
+| Template signature: new param vs options struct? | New param (breaking) | No other callers in the codebase; options struct is premature |

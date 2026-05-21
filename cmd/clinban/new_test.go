@@ -422,6 +422,95 @@ func TestNewNoInteractiveNoTmpFileLeft(t *testing.T) {
 	}
 }
 
+// --- Default type fallback tests ---
+
+// setupWorkDirWithConfig creates a temp work dir like setupWorkDir but also
+// writes a .clinban config file with the given content into the root.
+func setupWorkDirWithConfig(t *testing.T, configContent string) (root, ticketsDir, archiveDir string) {
+	t.Helper()
+	root, ticketsDir, archiveDir = setupWorkDir(t)
+	cfgPath := filepath.Join(root, ".clinban")
+	if err := os.WriteFile(cfgPath, []byte(configContent), 0o600); err != nil {
+		t.Fatalf("setupWorkDirWithConfig: write .clinban: %v", err)
+	}
+	return root, ticketsDir, archiveDir
+}
+
+// TestNewNoInteractiveDefaultTypeUsedWhenNoFlagSet verifies that when
+// default_type = "task" is in .clinban and --type is omitted, the command
+// exits 0 and creates a ticket with type: task.
+func TestNewNoInteractiveDefaultTypeUsedWhenNoFlagSet(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	root, ticketsDir, _ := setupWorkDirWithConfig(t, `default_type = "task"`)
+
+	stdout, stderr, code := runNew(t, bin, root, "--title", "Test default type ticket")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+
+	// Find the created ticket file.
+	entries, err := os.ReadDir(ticketsDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	var mdFiles []string
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			mdFiles = append(mdFiles, e.Name())
+		}
+	}
+	if len(mdFiles) == 0 {
+		t.Fatal("no ticket file created")
+	}
+
+	content, err := os.ReadFile(filepath.Join(ticketsDir, mdFiles[0]))
+	if err != nil {
+		t.Fatalf("reading ticket: %v", err)
+	}
+	if !strings.Contains(string(content), "type: task") {
+		t.Errorf("expected 'type: task' in ticket; content:\n%s", string(content))
+	}
+}
+
+// TestNewNoInteractiveNoDefaultTypeRequiresFlag verifies that when no
+// default_type is set in .clinban and --type is omitted, the command exits 1
+// with "required" on stderr.
+func TestNewNoInteractiveNoDefaultTypeRequiresFlag(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	// Use a config without default_type.
+	root, _, _ := setupWorkDirWithConfig(t, `# no default_type`)
+
+	stdout, stderr, code := runNew(t, bin, root, "--title", "Should fail without type")
+
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if !strings.Contains(stderr, "required") {
+		t.Errorf("stderr = %q, want 'required'", stderr)
+	}
+}
+
+// TestNewNoInteractiveInvalidDefaultTypeRequiresFlag verifies that when
+// default_type is set to an invalid value in .clinban and --type is omitted,
+// the command exits 1 (falls through to the "type required" error path).
+func TestNewNoInteractiveInvalidDefaultTypeRequiresFlag(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	root, _, _ := setupWorkDirWithConfig(t, `default_type = "notavalidtype"`)
+
+	stdout, stderr, code := runNew(t, bin, root, "--title", "Should fail with invalid default type")
+
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if !strings.Contains(stderr, "required") {
+		t.Errorf("stderr = %q, want 'required'", stderr)
+	}
+}
+
 // --- Interactive (T-17) tests ---
 
 const (

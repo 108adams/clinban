@@ -15,7 +15,7 @@ const testID = 42
 func TestNewReturnsParseableTicket(t *testing.T) {
 	t.Parallel()
 
-	b, err := template.New(1, time.Now())
+	b, err := template.New(1, time.Now(), "")
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestNewContainsIDAndTimestamp(t *testing.T) {
 	t.Parallel()
 
 	fixedTime := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
-	b, err := template.New(testID, fixedTime)
+	b, err := template.New(testID, fixedTime, "")
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -48,5 +48,21 @@ func TestNewContainsIDAndTimestamp(t *testing.T) {
 	wantTS := fixedTime.Format(time.RFC3339)
 	if !strings.Contains(got, wantTS) {
 		t.Errorf("output does not contain timestamp %q:\n%s", wantTS, got)
+	}
+}
+
+func TestNewWithDefaultType(t *testing.T) {
+	t.Parallel()
+
+	fixedTime := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	b, err := template.New(1, fixedTime, "bug")
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	got := string(b)
+	want := `type: "bug"`
+	if !strings.Contains(got, want) {
+		t.Errorf("output does not contain %q:\n%s", want, got)
 	}
 }

@@ -177,6 +177,43 @@ func TestLoad_MalformedTOML_ErrorWrapping(t *testing.T) {
 	}
 }
 
+// TestLoad_DefaultType_Set checks that default_type is read from the config file.
+func TestLoad_DefaultType_Set(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeConfigFile(t, dir, `default_type = "feature"
+`)
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	const want = "feature"
+	if cfg.DefaultType != want {
+		t.Errorf("DefaultType: got %q, want %q", cfg.DefaultType, want)
+	}
+}
+
+// TestLoad_DefaultType_Absent checks that DefaultType is empty string when not set.
+func TestLoad_DefaultType_Absent(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeConfigFile(t, dir, `tickets_dir = "tickets"
+`)
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.DefaultType != "" {
+		t.Errorf("DefaultType: got %q, want empty string", cfg.DefaultType)
+	}
+}
+
 // TestLoad_AbsoluteTicketsDir checks that absolute paths in config are used directly.
 func TestLoad_AbsoluteTicketsDir(t *testing.T) {
 	t.Parallel()

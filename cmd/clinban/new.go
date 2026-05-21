@@ -68,7 +68,7 @@ func runNewInteractive() error {
 	now := time.Now()
 
 	// Render the template.
-	tmplBytes, err := template.New(nextID, now)
+	tmplBytes, err := template.New(nextID, now, cfg.DefaultType)
 	if err != nil {
 		return fmt.Errorf("new: render template: %w", err)
 	}
@@ -196,8 +196,12 @@ func runNewNonInteractive(flags newFlags) error {
 		os.Exit(1)
 	}
 	if flags.ticketType == "" {
-		fmt.Fprintln(os.Stderr, "error: --type is required")
-		os.Exit(1)
+		if cfg.DefaultType != "" && ticket.Type(cfg.DefaultType).Valid() {
+			flags.ticketType = cfg.DefaultType
+		} else {
+			fmt.Fprintln(os.Stderr, "error: --type is required")
+			os.Exit(1)
+		}
 	}
 
 	// Validate --type value.
