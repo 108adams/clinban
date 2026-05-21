@@ -195,3 +195,15 @@ Archiving moves a `done` ticket from `tickets_dir` to `archive_dir`.
 4. Archived tickets are read-only from the perspective of normal operations.
    To reopen an archived ticket, run `clinban move <id> backlog`, which moves
    it back to `tickets_dir` with `status: backlog`.
+
+### 6.5 Remove a ticket
+
+Removing permanently deletes the ticket file from disk (active or archive
+directory). Use this only when a ticket should be fully discarded.
+
+1. Run `clinban remove <id>`.
+2. Clinban deletes the file. The ID is freed for reuse (though `clinban new`
+   will not reuse it — it always takes `max+1`).
+3. If no file matches the ID, Clinban exits 1 with `ticket not found`.
+4. If multiple files share the ID (a collision), Clinban exits 1, lists all
+   colliding filenames, and suggests running `clinban lint` to diagnose.
