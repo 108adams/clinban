@@ -66,3 +66,47 @@ func TestNewWithDefaultType(t *testing.T) {
 		t.Errorf("output does not contain %q:\n%s", want, got)
 	}
 }
+
+// TestNewTemplateFieldOrder verifies that "title:" appears before "id:" in the
+// rendered template output.
+func TestNewTemplateFieldOrder(t *testing.T) {
+	t.Parallel()
+
+	fixedTime := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	b, err := template.New(testID, fixedTime, "task")
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	got := string(b)
+
+	titleIdx := strings.Index(got, "title:")
+	idIdx := strings.Index(got, "id:")
+
+	if titleIdx == -1 {
+		t.Fatal("template output does not contain 'title:'")
+	}
+	if idIdx == -1 {
+		t.Fatal("template output does not contain 'id:'")
+	}
+	if titleIdx >= idIdx {
+		t.Errorf("'title:' (offset %d) must appear before 'id:' (offset %d) in template output:\n%s", titleIdx, idIdx, got)
+	}
+}
+
+// TestNewTemplateStatesComment verifies that the rendered template includes the
+// states hint comment below the status field.
+func TestNewTemplateStatesComment(t *testing.T) {
+	t.Parallel()
+
+	fixedTime := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	b, err := template.New(testID, fixedTime, "task")
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	const wantComment = "# states: backlog, in-progress, blocked, done"
+	if !strings.Contains(string(b), wantComment) {
+		t.Errorf("template output does not contain %q:\n%s", wantComment, string(b))
+	}
+}

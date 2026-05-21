@@ -39,10 +39,10 @@ Complete example:
 
 ```markdown
 ---
+title: "Fix login timeout on staging"
 id: "0042"
 status: "in-progress"
 type: "bug"
-title: "Fix login timeout on staging"
 tags: ["auth", "backend"]
 created: "2026-05-18T14:30:00Z"
 updated: "2026-05-18T15:00:00Z"
@@ -69,7 +69,7 @@ fields; Clinban ignores them but they clutter the file.
 | Field | Required | Owner | Constraints |
 |-------|----------|-------|-------------|
 | `id` | required | Clinban (tool) | Four zero-padded decimal digits: `0001`–`9999`. Unique across active and archived tickets. Never set or change this field manually. |
-| `status` | required | Clinban (tool) via `clinban move` | One of: `backlog`, `in-progress`, `blocked`, `done`. Change only through `clinban move`; see Section 5 for valid transitions. |
+| `status` | required | Clinban (tool) via `clinban move` | One of: `backlog`, `in-progress`, `blocked`, `done`. Change only through `clinban move`; see Section 5 for valid transitions. The new-ticket template includes a `# states: backlog, in-progress, blocked, done` hint comment below this field. |
 | `type` | required | Author | One of: `bug`, `task`, `feature`, `spike`. |
 | `title` | required | Author | Non-empty string. |
 | `tags` | optional | Author | YAML sequence of strings. Use an empty sequence `[]` when there are no tags. |

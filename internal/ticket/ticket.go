@@ -41,11 +41,13 @@ type Ticket struct {
 // frontmatter is the YAML-encodable shape of a ticket's header fields.
 // Tags uses the flow style so that an empty slice serialises as `tags: []`
 // rather than being omitted or rendered as a multi-line block.
+// Field order determines the YAML serialisation order: title is first to make
+// the human-facing summary immediately visible at the top of the file.
 type frontmatter struct {
+	Title   string    `yaml:"title"`
 	ID      string    `yaml:"id"`
 	Status  Status    `yaml:"status"`
 	Type    Type      `yaml:"type"`
-	Title   string    `yaml:"title"`
 	Tags    []string  `yaml:"tags,flow"`
 	Created time.Time `yaml:"created"`
 	Updated time.Time `yaml:"updated"`
@@ -129,10 +131,10 @@ func Marshal(t *Ticket) ([]byte, error) {
 	}
 
 	fm := frontmatter{
+		Title:   t.Title,
 		ID:      t.ID,
 		Status:  t.Status,
 		Type:    t.Type,
-		Title:   t.Title,
 		Tags:    tags,
 		Created: t.Created,
 		Updated: t.Updated,

@@ -18,12 +18,12 @@ const (
 	wantEmpty          = "ticket" // fallback: empty input yields "ticket"
 
 	// TASK-009 fallback cases.
-	titleCJK         = "你好世界"
-	wantCJK          = "ticket"
-	titleAllPunct    = "!!! ??? ..."
-	wantAllPunct     = "ticket"
-	titleHelloWorld  = "Hello World"
-	wantHelloWorld   = "hello-world"
+	titleCJK        = "你好世界"
+	wantCJK         = "ticket"
+	titleAllPunct   = "!!! ??? ..."
+	wantAllPunct    = "ticket"
+	titleHelloWorld = "Hello World"
+	wantHelloWorld  = "hello-world"
 )
 
 func TestSlugify(t *testing.T) {

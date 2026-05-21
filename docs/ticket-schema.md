@@ -3,7 +3,7 @@ title: Ticket Schema
 kind: reference
 scope: tickets
 summary: Defines Clinban ticket files, YAML frontmatter fields, filename convention, and ownership rules.
-updated: 2026-05-19
+updated: 2026-05-21
 links:
   - cli
   - validation
@@ -19,10 +19,10 @@ A Clinban ticket is a Markdown file with YAML frontmatter. The frontmatter is th
 
 ```yaml
 ---
+title: "Fix login timeout"
 id: "0042"
 status: "in-progress"
 type: "bug"
-title: "Fix login timeout"
 tags: ["auth", "backend"]
 created: "2026-05-18T14:30:00Z"
 updated: "2026-05-18T15:00:00Z"

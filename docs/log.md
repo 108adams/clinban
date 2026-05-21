@@ -103,6 +103,12 @@ links:
 - Updated: `docs/cli.md`, `docs/configuration.md`, `docs/log.md`
 - Notes: Added `clinban config` subcommand. No-args mode lists all three known keys with values, defaults, and set/not-set notes. Single `key=value` arg sets the key in `.clinban`, creating the file if absent, with validation for unknown keys, invalid `default_type` values, and empty path values.
 
+## [2026-05-21] update | Schema cleanup — title first, states comment in template (ticket 0016)
+
+- Source: `internal/ticket/ticket.go`, `internal/template/new.md`
+- Updated: `docs/ticket-schema.md`, `cmd/clinban/schema.md`, `docs/log.md`
+- Notes: Reordered `frontmatter` struct so `title` serialises as the first YAML field. Added `# states: backlog, in-progress, blocked, done` comment below the `status` field in the new-ticket template, mirroring the existing types hint. Updated example frontmatter blocks in both schema reference docs to reflect the new field order.
+
 ## [2026-05-20] update | GitHub migration — module path and CI
 
 - Source: migration commit `6a0cd17`

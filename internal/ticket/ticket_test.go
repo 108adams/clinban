@@ -41,11 +41,12 @@ func fixtureTicket() *ticket.Ticket {
 
 // fixtureContent returns the canonical textual representation of fixtureTicket.
 // This must match exactly what Marshal produces so that round-trip tests are valid.
+// Field order: title first (schema cleanup, 2026-05-21).
 const fixtureContent = `---
+title: Fix login timeout on staging
 id: "0042"
 status: in-progress
 type: bug
-title: Fix login timeout on staging
 tags: []
 created: 2026-05-18T14:30:00Z
 updated: 2026-05-18T15:00:00Z
@@ -54,10 +55,10 @@ updated: 2026-05-18T15:00:00Z
 
 // fixtureContentWithBody is a ticket that has a non-empty markdown body.
 const fixtureContentWithBody = `---
+title: A ticket with a body
 id: "0001"
 status: backlog
 type: task
-title: A ticket with a body
 tags: []
 created: 2026-05-18T10:00:00Z
 updated: 2026-05-18T10:00:00Z
@@ -70,10 +71,10 @@ Some markdown body here.
 
 // fixtureContentWithTags has a non-empty tags list.
 const fixtureContentWithTags = `---
+title: Add tag support
 id: "0007"
 status: blocked
 type: feature
-title: Add tag support
 tags:
     - alpha
     - beta
@@ -233,10 +234,10 @@ func TestParseEmptyBody(t *testing.T) {
 	t.Parallel()
 
 	const content = `---
+title: No body here
 id: "0001"
 status: backlog
 type: task
-title: No body here
 tags: []
 created: 2026-05-18T10:00:00Z
 updated: 2026-05-18T10:00:00Z
@@ -439,6 +440,56 @@ func assertTicketsEqual(t *testing.T, a, b *ticket.Ticket) {
 }
 
 // ---------------------------------------------------------------------------
+// TestMarshalFieldOrder — title must appear before id in serialised output
+// ---------------------------------------------------------------------------
+
+func TestMarshalFieldOrder(t *testing.T) {
+	t.Parallel()
+
+	tk := fixtureTicket()
+	out, err := ticket.Marshal(tk)
+	if err != nil {
+		t.Fatalf("Marshal() unexpected error: %v", err)
+	}
+
+	s := string(out)
+
+	titleIdx := strings.Index(s, "title:")
+	idIdx := strings.Index(s, "id:")
+
+	if titleIdx == -1 {
+		t.Fatal("Marshal output does not contain 'title:'")
+	}
+	if idIdx == -1 {
+		t.Fatal("Marshal output does not contain 'id:'")
+	}
+	if titleIdx >= idIdx {
+		t.Errorf("'title:' (offset %d) must appear before 'id:' (offset %d) in Marshal output:\n%s", titleIdx, idIdx, s)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestMarshalRoundtrip — all fields survive a marshal → parse cycle
+// ---------------------------------------------------------------------------
+
+func TestMarshalRoundtrip(t *testing.T) {
+	t.Parallel()
+
+	original := fixtureTicket()
+	out, err := ticket.Marshal(original)
+	if err != nil {
+		t.Fatalf("Marshal() unexpected error: %v", err)
+	}
+
+	recovered, err := ticket.Parse(out)
+	if err != nil {
+		t.Fatalf("Parse() unexpected error after Marshal: %v", err)
+	}
+
+	assertTicketsEqual(t, original, recovered)
+}
+
+// ---------------------------------------------------------------------------
 // ErrMissingFrontmatter sentinel check
 // ---------------------------------------------------------------------------
 
@@ -464,11 +515,12 @@ func TestParseCloseFenceAtEOF(t *testing.T) {
 	t.Parallel()
 
 	// Identical to fixtureContent but the trailing newline after "---" is removed.
+	// Field order mirrors the updated schema (title first).
 	const noTrailingNL = "---\n" +
+		"title: Fix login timeout on staging\n" +
 		"id: \"0042\"\n" +
 		"status: in-progress\n" +
 		"type: bug\n" +
-		"title: Fix login timeout on staging\n" +
 		"tags: []\n" +
 		"created: 2026-05-18T14:30:00Z\n" +
 		"updated: 2026-05-18T15:00:00Z\n" +
