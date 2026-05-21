@@ -68,32 +68,7 @@ func ruleValidType(t *ticket.Ticket, filename string, _ []string) []LintError {
 	return nil
 }
 
-// ruleIDMatchesFilename checks that the numeric prefix of filename matches t.ID.
-// Rule 4: extract leading digits from filename, compare with t.ID.
-func ruleIDMatchesFilename(t *ticket.Ticket, filename string, _ []string) []LintError {
-	// Extract the leading run of digit characters from the base filename.
-	prefix := leadingDigits(filename)
-	if prefix == "" || prefix != t.ID {
-		return []LintError{{
-			File:    filename,
-			Field:   "id",
-			Message: fmt.Sprintf("id %q does not match numeric prefix of filename %q", t.ID, filename),
-		}}
-	}
-	return nil
-}
-
-// leadingDigits returns the longest prefix of s consisting solely of ASCII digit characters.
-func leadingDigits(s string) string {
-	i := 0
-	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
-		i++
-	}
-	return s[:i]
-}
-
 // ruleTagsNonEmpty checks that every element in the tags list is a non-empty string.
-// Rule 6: no zero-value (empty-string) entries in tags.
 func ruleTagsNonEmpty(t *ticket.Ticket, filename string, _ []string) []LintError {
 	for i, tag := range t.Tags {
 		if strings.TrimSpace(tag) == "" {
@@ -108,7 +83,6 @@ func ruleTagsNonEmpty(t *ticket.Ticket, filename string, _ []string) []LintError
 }
 
 // ruleIDUnique checks that t.ID appears exactly once in allIDs.
-// Rule 7: flag if count > 1.
 func ruleIDUnique(t *ticket.Ticket, filename string, allIDs []string) []LintError {
 	count := 0
 	for _, id := range allIDs {

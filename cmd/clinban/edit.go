@@ -91,6 +91,8 @@ func runEdit(cmd *cobra.Command, args []string) error {
 			}
 			continue
 		}
+		// ID is derived from the managed filename, not from frontmatter.
+		t.ID = filepath.Base(livePath)[:4]
 
 		allIDs, err := st.AllIDs()
 		if err != nil {

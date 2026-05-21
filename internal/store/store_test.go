@@ -455,19 +455,17 @@ func TestWriteTicketAtomic(t *testing.T) {
 	}
 
 	// Content must be parseable and match the original ticket.
-	b, err := os.ReadFile(finalPath)
+	// Note: ticket.Parse does not set ID (ID is injected from filename by the
+	// store layer). Use store.ReadTicket to get the fully-populated Ticket.
+	got, err := s.ReadTicket(finalPath)
 	if err != nil {
-		t.Fatalf("read final file: %v", err)
+		t.Fatalf("ReadTicket written file: %v", err)
 	}
-	parsed, err := ticket.Parse(b)
-	if err != nil {
-		t.Fatalf("parse written file: %v", err)
+	if got.ID != tk.ID {
+		t.Errorf("got.ID = %q, want %q", got.ID, tk.ID)
 	}
-	if parsed.ID != tk.ID {
-		t.Errorf("parsed.ID = %q, want %q", parsed.ID, tk.ID)
-	}
-	if parsed.Title != tk.Title {
-		t.Errorf("parsed.Title = %q, want %q", parsed.Title, tk.Title)
+	if got.Title != tk.Title {
+		t.Errorf("got.Title = %q, want %q", got.Title, tk.Title)
 	}
 }
 
@@ -511,8 +509,9 @@ func TestReadTicket(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadTicket error: %v", err)
 	}
+	// ID must be injected from the filename prefix, not from frontmatter.
 	if got.ID != "0001" {
-		t.Errorf("ID = %q, want %q", got.ID, "0001")
+		t.Errorf("ID = %q, want %q (injected from filename)", got.ID, "0001")
 	}
 	if got.Title != testTitle {
 		t.Errorf("Title = %q, want %q", got.Title, testTitle)
@@ -526,6 +525,90 @@ func TestReadTicketNotFound(t *testing.T) {
 	_, err := s.ReadTicket(filepath.Join(s.TicketsDir, "9999-missing.md"))
 	if err == nil {
 		t.Fatal("ReadTicket: expected error for missing file, got nil")
+	}
+}
+
+// TestReadTicketIDInjectedFromFilename covers the specific done-criterion that
+// a path whose base is "0042-slug.md" returns t.ID == "0042".
+func TestReadTicketIDInjectedFromFilename(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		filename string
+		wantID   string
+	}{
+		{
+			name:     "four-digit prefix 0042 injected",
+			filename: "0042-some-slug.md",
+			wantID:   "0042",
+		},
+		{
+			name:     "leading-zero prefix 0001 injected",
+			filename: "0001-fix-login-timeout.md",
+			wantID:   "0001",
+		},
+		{
+			name:     "prefix 9999 injected",
+			filename: "9999-last-ticket.md",
+			wantID:   "9999",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			s := newStore(t)
+
+			tk := makeTicket(tc.wantID, testTitle)
+			path := writeTicketFile(t, s.TicketsDir, tc.filename, tk)
+
+			got, err := s.ReadTicket(path)
+			if err != nil {
+				t.Fatalf("ReadTicket error: %v", err)
+			}
+			if got.ID != tc.wantID {
+				t.Errorf("ID = %q, want %q — ID must be injected from filename prefix", got.ID, tc.wantID)
+			}
+		})
+	}
+}
+
+// TestReadTicketNonManagedFilenameError covers the done-criterion that a path
+// whose base does not match NNNN- returns the managed-ticket error.
+func TestReadTicketNonManagedFilenameError(t *testing.T) {
+	t.Parallel()
+
+	nonManagedNames := []struct {
+		name     string
+		filename string
+	}{
+		{name: "no numeric prefix", filename: "fix-login.md"},
+		{name: "only 3 digits", filename: "042-slug.md"},
+		{name: "letters then digits", filename: "abc-0001.md"},
+		{name: "no dash after digits", filename: "0001slug.md"},
+		{name: "plain readme", filename: "README.md"},
+		{name: "draft tmp file", filename: ".clinban-draft.md"},
+	}
+
+	for _, tc := range nonManagedNames {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			s := newStore(t)
+
+			// Write valid ticket content with a non-managed filename.
+			tk := makeTicket("0001", testTitle)
+			path := writeTicketFile(t, s.TicketsDir, tc.filename, tk)
+
+			_, err := s.ReadTicket(path)
+			if err == nil {
+				t.Fatalf("ReadTicket(%q): expected error for non-managed filename, got nil", tc.filename)
+			}
+			const wantSubstr = "is not a managed ticket"
+			if !strings.Contains(err.Error(), wantSubstr) {
+				t.Errorf("ReadTicket(%q) error = %q; want it to contain %q", tc.filename, err.Error(), wantSubstr)
+			}
+		})
 	}
 }
 

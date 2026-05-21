@@ -40,7 +40,6 @@ Complete example:
 ```markdown
 ---
 title: "Fix login timeout on staging"
-id: "0042"
 status: "in-progress"
 type: "bug"
 tags: ["auth", "backend"]
@@ -59,7 +58,7 @@ Describe the problem here. Markdown is supported.
 - [ ] Fix deployed to staging
 ```
 
-All seven frontmatter fields must be present. Do not add extra frontmatter
+All six frontmatter fields must be present. Do not add extra frontmatter
 fields; Clinban ignores them but they clutter the file.
 
 ---
@@ -68,17 +67,23 @@ fields; Clinban ignores them but they clutter the file.
 
 | Field | Required | Owner | Constraints |
 |-------|----------|-------|-------------|
-| `id` | required | Clinban (tool) | Four zero-padded decimal digits: `0001`–`9999`. Unique across active and archived tickets. Never set or change this field manually. |
+| `title` | required | Author | Non-empty string. |
 | `status` | required | Clinban (tool) via `clinban move` | One of: `backlog`, `in-progress`, `blocked`, `done`. Change only through `clinban move`; see Section 5 for valid transitions. The new-ticket template includes a `# states: backlog, in-progress, blocked, done` hint comment below this field. |
 | `type` | required | Author | One of: `bug`, `task`, `feature`, `spike`. |
-| `title` | required | Author | Non-empty string. |
 | `tags` | optional | Author | YAML sequence of strings. Use an empty sequence `[]` when there are no tags. |
 | `created` | required | Clinban (tool) | RFC 3339 timestamp (e.g. `2026-05-18T14:30:00Z`). Set by Clinban on creation or registration. Do not change this field. |
 | `updated` | required | Clinban (tool) | RFC 3339 timestamp. Refreshed by Clinban on every write. Do not change this field. |
 
+**Ticket ID:**
+
+The ticket ID is **not** stored in frontmatter. Clinban derives it exclusively
+from the filename's four-digit prefix (e.g. `0042` in `0042-fix-login.md`).
+When reading a ticket, the store injects the ID from the filename. When writing,
+the ID is encoded only in the filename. Never add an `id:` line to frontmatter.
+
 **Field ownership rules:**
 
-- Fields owned by Clinban (`id`, `created`, `updated`) are set and maintained
+- Fields owned by Clinban (`created`, `updated`) are set and maintained
   by the tool. If you write a ticket file directly, omit those fields and let
   Clinban fill them in — or use `clinban register` which will overwrite them.
 - `status` is initialized by Clinban and must only be changed through

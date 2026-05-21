@@ -13,6 +13,12 @@ links:
 
 # Documentation Log
 
+## [2026-05-21] refactor | Remove id: from frontmatter; ID derived from filename
+
+- Source: `internal/ticket/ticket.go`, `internal/store/write.go`, `internal/lint/rules.go`, `internal/template/new.md`, `cmd/clinban/new.go`
+- Updated: `cmd/clinban/schema.md`, `docs/ticket-schema.md`, `docs/log.md`
+- Notes: Removed `id:` field from YAML frontmatter. The ticket ID is now derived exclusively from the filename's 4-digit prefix (e.g. `0042` in `0042-slug.md`). `ticket.Parse` no longer reads `id:` from frontmatter; `store.ReadTicket` injects the ID from the filename after parsing. `ticket.Marshal` no longer emits an `id:` line. The `ruleIDMatchesFilename` lint rule and its `leadingDigits` helper were removed as dead code — since the ID is always set from the filename, the check can never fire. Updated both schema reference documents to omit `id:` from example frontmatter blocks, field tables, and ownership descriptions; added a "System-Derived Fields" section to `docs/ticket-schema.md` explaining the filename-derived ID.
+
 ## [2026-05-21] update | Document /tickets skill as product deliverable
 
 - Source: `.claude/skills/tickets/SKILL.md`, conversation

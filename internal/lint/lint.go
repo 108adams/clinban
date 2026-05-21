@@ -31,21 +31,19 @@ func (e LintError) Error() string {
 // ruleFunc is the signature shared by all rule functions.
 type ruleFunc func(t *ticket.Ticket, filename string, allIDs []string) []LintError
 
-// rules is the ordered list of all 6 lint rules.
+// rules is the ordered list of all lint rules.
 var rules = []ruleFunc{
-	ruleRequiredFields,    // 1
-	ruleValidStatus,       // 2
-	ruleValidType,         // 3
-	ruleIDMatchesFilename, // 4
-	ruleTagsNonEmpty,      // 5
-	ruleIDUnique,          // 6
+	ruleRequiredFields,
+	ruleValidStatus,
+	ruleValidType,
+	ruleTagsNonEmpty,
+	ruleIDUnique,
 }
 
 // Lint runs all schema rules against t and returns every violation found.
 //
 // The filename argument should be the base filename used for user-facing error
-// output and for the rule that checks whether the filename prefix matches the
-// ticket ID. The allIDs argument is the repository context used for uniqueness
+// output. The allIDs argument is the repository context used for uniqueness
 // checks across active and archived tickets.
 //
 // Returns an empty (never nil) slice when the ticket is valid.

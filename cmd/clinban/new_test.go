@@ -105,11 +105,16 @@ func TestNewNoInteractiveCreatesCorrectContent(t *testing.T) {
 	}
 	body := string(content)
 
+	// The ID lives in the filename prefix, not in the frontmatter.
+	wantFilePath := filepath.Join(ticketsDir, wantFile)
+	if !strings.HasPrefix(filepath.Base(wantFilePath), newExpectedID+"-") {
+		t.Errorf("ticket filename %q does not have expected id prefix %q", filepath.Base(wantFilePath), newExpectedID)
+	}
+
 	checks := []struct {
 		desc    string
 		wantStr string
 	}{
-		{"id field", fmt.Sprintf(`id: "%s"`, newExpectedID)},
 		{"status field", `status: backlog`},
 		{"type field", fmt.Sprintf(`type: %s`, newTestType)},
 		{"title field", fmt.Sprintf(`title: %s`, newTestTitle)},
@@ -122,6 +127,10 @@ func TestNewNoInteractiveCreatesCorrectContent(t *testing.T) {
 		if !strings.Contains(body, c.wantStr) {
 			t.Errorf("%s: file content does not contain %q\nfull content:\n%s", c.desc, c.wantStr, body)
 		}
+	}
+	// Frontmatter must not contain id: field.
+	if strings.Contains(body, "id:") {
+		t.Errorf("ticket frontmatter must not contain 'id:' field; content:\n%s", body)
 	}
 }
 
@@ -339,7 +348,7 @@ func TestNewNoInteractiveStatusIsBacklog(t *testing.T) {
 }
 
 // TestNewNoInteractiveFourDigitPaddedID verifies that the ID is zero-padded
-// to exactly 4 digits.
+// to exactly 4 digits in the filename prefix.
 func TestNewNoInteractiveFourDigitPaddedID(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
@@ -354,13 +363,18 @@ func TestNewNoInteractiveFourDigitPaddedID(t *testing.T) {
 	}
 
 	wantFile := fmt.Sprintf("%s-%s.md", newExpectedID, newExpectedSlug)
+	// The ticket file must exist with a 4-digit zero-padded ID prefix.
+	if _, err := os.Stat(filepath.Join(ticketsDir, wantFile)); os.IsNotExist(err) {
+		t.Errorf("expected ticket file %q with 4-digit zero-padded id prefix %q not found in %q",
+			wantFile, newExpectedID, ticketsDir)
+	}
+	// Verify that the frontmatter does not contain an id: field.
 	content, err := os.ReadFile(filepath.Join(ticketsDir, wantFile))
 	if err != nil {
 		t.Fatalf("reading ticket: %v", err)
 	}
-	// The id field must be "0001" (4-digit zero-padded).
-	if !strings.Contains(string(content), `id: "0001"`) {
-		t.Errorf("expected 4-digit zero-padded id '0001' in file:\n%s", string(content))
+	if strings.Contains(string(content), "id:") {
+		t.Errorf("ticket frontmatter must not contain 'id:' field; content:\n%s", string(content))
 	}
 }
 
@@ -653,11 +667,14 @@ func TestNewInteractiveHappyPath(t *testing.T) {
 	}
 	body := string(content)
 
+	// ID is in the filename prefix, not frontmatter.
+	if strings.Contains(body, "id:") {
+		t.Errorf("ticket frontmatter must not contain 'id:' field; content:\n%s", body)
+	}
 	checks := []struct {
 		desc    string
 		wantStr string
 	}{
-		{"id field", fmt.Sprintf(`id: "%s"`, interactiveTestID)},
 		{"status field", `status:`},
 		{"type field", interactiveTestType},
 		{"title field", interactiveTestTitle},
@@ -1047,11 +1064,14 @@ func TestNewInteractiveNoArgsUnchanged(t *testing.T) {
 	}
 	body := string(content)
 
+	// ID is in the filename prefix, not frontmatter.
+	if strings.Contains(body, "id:") {
+		t.Errorf("ticket frontmatter must not contain 'id:' field; content:\n%s", body)
+	}
 	checks := []struct {
 		desc    string
 		wantStr string
 	}{
-		{"id field", fmt.Sprintf(`id: "%s"`, interactiveTestID)},
 		{"status field", `status:`},
 		{"type field", interactiveTestType},
 		{"title field", interactiveTestTitle},

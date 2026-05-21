@@ -128,8 +128,10 @@ func TestRegisterHappyPath(t *testing.T) {
 	}
 }
 
-// TestRegisterOverwritesSystemFields verifies that id, created, updated in the
-// registered file are system-assigned values (not the placeholder "9999").
+// TestRegisterOverwritesSystemFields verifies that the registered file is given
+// a system-assigned ID (encoded in the filename prefix, not in frontmatter) and
+// that the placeholder "9999" from the source file does not appear in the
+// written content.
 func TestRegisterOverwritesSystemFields(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
@@ -148,25 +150,29 @@ func TestRegisterOverwritesSystemFields(t *testing.T) {
 
 	// Read the written ticket and verify system fields were overwritten.
 	entries, _ := os.ReadDir(ticketsDir)
-	var registeredPath string
+	var registeredName, registeredPath string
 	for _, e := range entries {
 		if strings.HasSuffix(e.Name(), ".md") {
+			registeredName = e.Name()
 			registeredPath = filepath.Join(ticketsDir, e.Name())
 		}
 	}
 	if registeredPath == "" {
 		t.Fatal("no ticket file found in tickets dir")
 	}
+
+	// The filename must start with the system-assigned prefix "0001-".
+	if !strings.HasPrefix(registeredName, "0001-") {
+		t.Errorf("registered filename %q does not start with system-assigned prefix '0001-'", registeredName)
+	}
+
 	content, err := os.ReadFile(registeredPath)
 	if err != nil {
 		t.Fatalf("read registered ticket: %v", err)
 	}
-	// id should be 0001 (first ticket), not the placeholder 9999.
-	if strings.Contains(string(content), `id: "9999"`) {
-		t.Errorf("registered ticket still contains placeholder id '9999'")
-	}
-	if !strings.Contains(string(content), `id: "0001"`) {
-		t.Errorf("registered ticket does not have system-assigned id '0001'; content:\n%s", content)
+	// Frontmatter must not contain any id: field (ID lives only in the filename).
+	if strings.Contains(string(content), "id:") {
+		t.Errorf("registered ticket frontmatter must not contain 'id:' field; content:\n%s", content)
 	}
 }
 

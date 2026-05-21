@@ -253,68 +253,6 @@ func TestRule3ValidType(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// TestRule4IDMatchesFilename — numeric prefix of filename must equal t.ID.
-// --------------------------------------------------------------------------
-
-func TestRule4IDMatchesFilename(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		id       string
-		filename string
-		wantErr  bool
-	}{
-		{
-			name:     "id matches filename prefix",
-			id:       "0042",
-			filename: "0042-fix-login-timeout.md",
-			wantErr:  false,
-		},
-		{
-			name:     "id does not match filename prefix",
-			id:       "0001",
-			filename: "0042-fix-login-timeout.md",
-			wantErr:  true,
-		},
-		{
-			name:     "filename has no numeric prefix",
-			id:       "0042",
-			filename: "fix-login-timeout.md",
-			wantErr:  true,
-		},
-		{
-			name:     "single-digit prefix padded to 4 digits matches",
-			id:       "0007",
-			filename: "0007-small-fix.md",
-			wantErr:  false,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			tk := validTicket()
-			tk.ID = tc.id
-			// Use the appropriate allIDs to avoid rule 7 noise.
-			errs := lint.Lint(tk, tc.filename, []string{tc.id})
-			hasIDErr := false
-			for _, e := range errs {
-				if e.Field == "id" && strings.Contains(e.Message, "filename") {
-					hasIDErr = true
-				}
-			}
-			if tc.wantErr && !hasIDErr {
-				t.Errorf("expected id/filename mismatch error, got errors: %v", errs)
-			}
-			if !tc.wantErr && hasIDErr {
-				t.Errorf("unexpected id/filename error: %v", errs)
-			}
-		})
-	}
-}
-
-// --------------------------------------------------------------------------
 // TestRule1TimestampZeroValue — zero time.Time triggers an error from rule 1
 // (ruleRequiredFields); the message is the precise RFC3339 parse failure text.
 // --------------------------------------------------------------------------
@@ -528,7 +466,6 @@ func TestLintAllRulesOrdered(t *testing.T) {
 		// Tags has empty element → rule 6
 		Tags: []string{""},
 	}
-	// filename has no numeric prefix → rule 4 fires (but rule 1 fires on id first)
 	errs := lint.Lint(tk, "no-prefix.md", duplicateIDs())
 	// We expect multiple errors; just assert at least one per broken rule.
 	if len(errs) == 0 {

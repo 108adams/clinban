@@ -20,7 +20,6 @@ A Clinban ticket is a Markdown file with YAML frontmatter. The frontmatter is th
 ```yaml
 ---
 title: "Fix login timeout"
-id: "0042"
 status: "in-progress"
 type: "bug"
 tags: ["auth", "backend"]
@@ -33,10 +32,9 @@ Markdown body goes here.
 
 | Field | Required | Type | Owner | Constraint |
 |---|---:|---|---|---|
-| `id` | yes | string | Clinban | Four zero-padded digits, unique across active and archived tickets. |
+| `title` | yes | string | Author | Non-empty. |
 | `status` | yes | string | Clinban/user via `move` | One of `backlog`, `in-progress`, `blocked`, `done`. |
 | `type` | yes | string | Author | One of `bug`, `task`, `feature`, `spike`. |
-| `title` | yes | string | Author | Non-empty. |
 | `tags` | no | list of strings | Author | Free-form labels; empty list is valid. |
 | `created` | yes | RFC3339 timestamp | Clinban | Set on creation or registration. |
 | `updated` | yes | RFC3339 timestamp | Clinban | Refreshed on Clinban writes. |
@@ -57,9 +55,15 @@ Example:
 
 The slug is derived from the first five meaningful words of the title. Tokens are lowercased, stripped to ASCII letters and digits, and joined with hyphens.
 
+## System-Derived Fields
+
+### id
+
+The ticket ID is derived exclusively from the filename's four-digit prefix and is **not stored in frontmatter**. For example, the file `0042-fix-login-timeout.md` has ID `0042`. The store layer injects this value at read time; it is never written to the YAML frontmatter block. Do not add an `id:` line to any ticket file.
+
 ## System-Owned Fields
 
-Clinban owns `id`, `created`, and `updated`. On creation or registration, external values for those fields are ignored or overwritten.
+Clinban owns `created` and `updated`. On creation or registration, external values for those fields are ignored or overwritten.
 
 `status` is initialized by Clinban and normally changed through `clinban move`. Direct file writers can still change it, but `clinban lint` only validates that the value is legal; it does not reconstruct transition history.
 

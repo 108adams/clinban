@@ -21,7 +21,8 @@ var ErrMissingFrontmatter = errors.New("ticket: parse: missing frontmatter")
 // fence.
 type Ticket struct {
 	// ID is the zero-padded four-digit ticket identifier, for example "0042".
-	ID string `yaml:"id"`
+	// It is derived from the filename by the store layer and is never stored in YAML frontmatter.
+	ID string
 	// Status is the current workflow state.
 	Status Status `yaml:"status"`
 	// Type is the ticket's controlled category.
@@ -45,7 +46,6 @@ type Ticket struct {
 // the human-facing summary immediately visible at the top of the file.
 type frontmatter struct {
 	Title   string    `yaml:"title"`
-	ID      string    `yaml:"id"`
 	Status  Status    `yaml:"status"`
 	Type    Type      `yaml:"type"`
 	Tags    []string  `yaml:"tags,flow"`
@@ -109,7 +109,8 @@ func Parse(content []byte) (*Ticket, error) {
 	}
 
 	return &Ticket{
-		ID:      fm.ID,
+		// ID is intentionally not set here — it is derived from the filename by
+		// the store layer (store.ReadTicket). Parse always returns t.ID == "".
 		Status:  fm.Status,
 		Type:    fm.Type,
 		Title:   fm.Title,
@@ -131,8 +132,8 @@ func Marshal(t *Ticket) ([]byte, error) {
 	}
 
 	fm := frontmatter{
-		Title:   t.Title,
-		ID:      t.ID,
+		Title: t.Title,
+		// ID is not stored in frontmatter — it is derived from the filename.
 		Status:  t.Status,
 		Type:    t.Type,
 		Tags:    tags,

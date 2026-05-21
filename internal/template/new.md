@@ -1,6 +1,5 @@
 ---
 title: ""
-id: "{{printf "%04d" .ID}}"
 status: "backlog"
 # states: backlog, in-progress, blocked, done
 type: "{{.Type}}"

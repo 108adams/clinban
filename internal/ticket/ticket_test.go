@@ -26,9 +26,11 @@ func fixedTime(s string) time.Time {
 }
 
 // fixtureTicket returns a canonical fixture ticket used across multiple tests.
+// Note: ID is not set here because Parse no longer reads it from frontmatter;
+// callers (the store layer) are responsible for setting ID from the filename.
 func fixtureTicket() *ticket.Ticket {
 	return &ticket.Ticket{
-		ID:      "0042",
+		ID:      "",
 		Status:  ticket.StatusInProgress,
 		Type:    ticket.TypeBug,
 		Title:   "Fix login timeout on staging",
@@ -42,7 +44,20 @@ func fixtureTicket() *ticket.Ticket {
 // fixtureContent returns the canonical textual representation of fixtureTicket.
 // This must match exactly what Marshal produces so that round-trip tests are valid.
 // Field order: title first (schema cleanup, 2026-05-21).
+// Note: no id: line — ID is derived from the filename by the store layer, not stored in YAML.
 const fixtureContent = `---
+title: Fix login timeout on staging
+status: in-progress
+type: bug
+tags: []
+created: 2026-05-18T14:30:00Z
+updated: 2026-05-18T15:00:00Z
+---
+`
+
+// fixtureContentWithID is a file that contains a legacy id: field in frontmatter.
+// Parse must ignore it (yaml.v3 silently drops unknown fields) and return t.ID == "".
+const fixtureContentWithID = `---
 title: Fix login timeout on staging
 id: "0042"
 status: in-progress
@@ -54,9 +69,9 @@ updated: 2026-05-18T15:00:00Z
 `
 
 // fixtureContentWithBody is a ticket that has a non-empty markdown body.
+// No id: field — ID is derived from filename by the store layer.
 const fixtureContentWithBody = `---
 title: A ticket with a body
-id: "0001"
 status: backlog
 type: task
 tags: []
@@ -70,9 +85,9 @@ Some markdown body here.
 `
 
 // fixtureContentWithTags has a non-empty tags list.
+// No id: field — ID is derived from filename by the store layer.
 const fixtureContentWithTags = `---
 title: Add tag support
-id: "0007"
 status: blocked
 type: feature
 tags:
@@ -160,8 +175,9 @@ func TestParse(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Parse() unexpected error: %v", err)
 		}
-		if tk.ID != "0042" {
-			t.Errorf("ID = %q, want %q", tk.ID, "0042")
+		// ID is always empty after Parse — the store layer sets it from the filename.
+		if tk.ID != "" {
+			t.Errorf("ID = %q, want empty string (ID is not read from frontmatter)", tk.ID)
 		}
 		if tk.Status != ticket.StatusInProgress {
 			t.Errorf("Status = %q, want %q", tk.Status, ticket.StatusInProgress)
@@ -250,6 +266,40 @@ updated: 2026-05-18T10:00:00Z
 	if tk.Body != "" {
 		t.Errorf("Body = %q, want empty string", tk.Body)
 	}
+	// id: in frontmatter must be ignored; ID is always "" after Parse.
+	if tk.ID != "" {
+		t.Errorf("ID = %q, want empty string (id: in frontmatter must be ignored)", tk.ID)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestParseIDIgnored — done criteria: id: in frontmatter is silently ignored
+// ---------------------------------------------------------------------------
+
+func TestParseIDIgnored(t *testing.T) {
+	t.Parallel()
+
+	t.Run("id present in frontmatter returns empty ID", func(t *testing.T) {
+		t.Parallel()
+		tk, err := ticket.Parse([]byte(fixtureContentWithID))
+		if err != nil {
+			t.Fatalf("Parse() unexpected error: %v", err)
+		}
+		if tk.ID != "" {
+			t.Errorf("ID = %q, want empty string; id: field in YAML must be ignored by Parse", tk.ID)
+		}
+	})
+
+	t.Run("no id field in frontmatter returns empty ID and no error", func(t *testing.T) {
+		t.Parallel()
+		tk, err := ticket.Parse([]byte(fixtureContent))
+		if err != nil {
+			t.Fatalf("Parse() unexpected error: %v", err)
+		}
+		if tk.ID != "" {
+			t.Errorf("ID = %q, want empty string", tk.ID)
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -440,10 +490,10 @@ func assertTicketsEqual(t *testing.T, a, b *ticket.Ticket) {
 }
 
 // ---------------------------------------------------------------------------
-// TestMarshalFieldOrder — title must appear before id in serialised output
+// TestMarshalNoID — Marshal must not emit an id: line (done criterion)
 // ---------------------------------------------------------------------------
 
-func TestMarshalFieldOrder(t *testing.T) {
+func TestMarshalNoID(t *testing.T) {
 	t.Parallel()
 
 	tk := fixtureTicket()
@@ -454,17 +504,11 @@ func TestMarshalFieldOrder(t *testing.T) {
 
 	s := string(out)
 
-	titleIdx := strings.Index(s, "title:")
-	idIdx := strings.Index(s, "id:")
-
-	if titleIdx == -1 {
+	if strings.Contains(s, "id:") {
+		t.Errorf("Marshal output must not contain 'id:' line, but got:\n%s", s)
+	}
+	if strings.Index(s, "title:") == -1 {
 		t.Fatal("Marshal output does not contain 'title:'")
-	}
-	if idIdx == -1 {
-		t.Fatal("Marshal output does not contain 'id:'")
-	}
-	if titleIdx >= idIdx {
-		t.Errorf("'title:' (offset %d) must appear before 'id:' (offset %d) in Marshal output:\n%s", titleIdx, idIdx, s)
 	}
 }
 
@@ -514,8 +558,7 @@ func TestParseMissingFrontmatterSentinel(t *testing.T) {
 func TestParseCloseFenceAtEOF(t *testing.T) {
 	t.Parallel()
 
-	// Identical to fixtureContent but the trailing newline after "---" is removed.
-	// Field order mirrors the updated schema (title first).
+	// Has id: in frontmatter to verify backward compat — yaml.v3 ignores the unknown field.
 	const noTrailingNL = "---\n" +
 		"title: Fix login timeout on staging\n" +
 		"id: \"0042\"\n" +
@@ -530,8 +573,9 @@ func TestParseCloseFenceAtEOF(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse() unexpected error for EOF fence: %v", err)
 	}
-	if tk.ID != "0042" {
-		t.Errorf("ID = %q, want %q", tk.ID, "0042")
+	// id: in frontmatter is ignored; ID is always "" after Parse.
+	if tk.ID != "" {
+		t.Errorf("ID = %q, want empty string (id: field must be ignored by Parse)", tk.ID)
 	}
 	if tk.Body != "" {
 		t.Errorf("Body = %q, want empty string", tk.Body)
@@ -543,15 +587,17 @@ func TestParseCloseFenceAtEOF(t *testing.T) {
 func TestParseCRLF(t *testing.T) {
 	t.Parallel()
 
-	// Take fixtureContent and replace every \n with \r\n.
-	crlf := strings.ReplaceAll(fixtureContent, "\n", "\r\n")
+	// Take fixtureContentWithID (has id: field) and replace every \n with \r\n.
+	// This also validates that id: is ignored even with CRLF normalisation.
+	crlf := strings.ReplaceAll(fixtureContentWithID, "\n", "\r\n")
 
 	tk, err := ticket.Parse([]byte(crlf))
 	if err != nil {
 		t.Fatalf("Parse() unexpected error for CRLF content: %v", err)
 	}
-	if tk.ID != "0042" {
-		t.Errorf("ID = %q, want %q", tk.ID, "0042")
+	// id: in frontmatter must be ignored; ID is always "" after Parse.
+	if tk.ID != "" {
+		t.Errorf("ID = %q, want empty string (id: field must be ignored by Parse)", tk.ID)
 	}
 	if tk.Title != "Fix login timeout on staging" {
 		t.Errorf("Title = %q, want %q", tk.Title, "Fix login timeout on staging")

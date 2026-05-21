@@ -77,7 +77,7 @@ func runNewInteractive(body string) error {
 	if !ticket.Type(defType).Valid() {
 		defType = ""
 	}
-	tmplBytes, err := template.New(nextID, now, defType)
+	tmplBytes, err := template.New(now, defType)
 	if err != nil {
 		return fmt.Errorf("new: render template: %w", err)
 	}
@@ -127,6 +127,7 @@ func runNewInteractive(body string) error {
 		_ = os.Remove(tmpPath)
 		return ExitError{Code: 1, Err: fmt.Errorf("new: parse ticket: %w", err)}
 	}
+	t.ID = fmt.Sprintf("%04d", nextID)
 
 	// Collect existing IDs before the Rename so the new ticket is not yet
 	// visible to the disk scan. AllIDs must be called here — after Rename the
@@ -175,6 +176,7 @@ func runNewInteractive(body string) error {
 		if err != nil {
 			return fmt.Errorf("new: parse after re-open: %w", err)
 		}
+		t.ID = fmt.Sprintf("%04d", nextID)
 	}
 
 	// Compute final path after the ticket has passed lint, because the title may

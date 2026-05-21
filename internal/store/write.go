@@ -22,6 +22,12 @@ func (s *Store) ReadTicket(path string) (*ticket.Ticket, error) {
 	if err != nil {
 		return nil, fmt.Errorf("store: parse ticket %s: %w", path, err)
 	}
+	base := filepath.Base(path)
+	m := idPattern.FindStringSubmatch(base)
+	if m == nil {
+		return nil, fmt.Errorf("store: read ticket: filename %q is not a managed ticket", base)
+	}
+	t.ID = m[1]
 	return t, nil
 }
 

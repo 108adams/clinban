@@ -1,7 +1,6 @@
 package template_test
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -10,12 +9,12 @@ import (
 	"github.com/108adams/clinban/internal/ticket"
 )
 
-const testID = 42
+var fixedTime = time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
 
 func TestNewReturnsParseableTicket(t *testing.T) {
 	t.Parallel()
 
-	b, err := template.New(1, time.Now(), "")
+	b, err := template.New(time.Now(), "")
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -27,22 +26,15 @@ func TestNewReturnsParseableTicket(t *testing.T) {
 	}
 }
 
-func TestNewContainsIDAndTimestamp(t *testing.T) {
+func TestNewContainsTimestamp(t *testing.T) {
 	t.Parallel()
 
-	fixedTime := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
-	b, err := template.New(testID, fixedTime, "")
+	b, err := template.New(fixedTime, "")
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
 
 	got := string(b)
-
-	// ID is rendered as a zero-padded 4-digit string, e.g. "0042"
-	wantID := fmt.Sprintf("%04d", testID)
-	if !strings.Contains(got, wantID) {
-		t.Errorf("output does not contain ID %q:\n%s", wantID, got)
-	}
 
 	// Timestamp is rendered in RFC3339 format
 	wantTS := fixedTime.Format(time.RFC3339)
@@ -51,11 +43,24 @@ func TestNewContainsIDAndTimestamp(t *testing.T) {
 	}
 }
 
+func TestNewOutputContainsNoIDField(t *testing.T) {
+	t.Parallel()
+
+	b, err := template.New(fixedTime, "task")
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	got := string(b)
+	if strings.Contains(got, "id:") {
+		t.Errorf("template output must not contain 'id:' field, got:\n%s", got)
+	}
+}
+
 func TestNewWithDefaultType(t *testing.T) {
 	t.Parallel()
 
-	fixedTime := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
-	b, err := template.New(1, fixedTime, "bug")
+	b, err := template.New(fixedTime, "bug")
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -67,40 +72,12 @@ func TestNewWithDefaultType(t *testing.T) {
 	}
 }
 
-// TestNewTemplateFieldOrder verifies that "title:" appears before "id:" in the
-// rendered template output.
-func TestNewTemplateFieldOrder(t *testing.T) {
-	t.Parallel()
-
-	fixedTime := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
-	b, err := template.New(testID, fixedTime, "task")
-	if err != nil {
-		t.Fatalf("New returned error: %v", err)
-	}
-
-	got := string(b)
-
-	titleIdx := strings.Index(got, "title:")
-	idIdx := strings.Index(got, "id:")
-
-	if titleIdx == -1 {
-		t.Fatal("template output does not contain 'title:'")
-	}
-	if idIdx == -1 {
-		t.Fatal("template output does not contain 'id:'")
-	}
-	if titleIdx >= idIdx {
-		t.Errorf("'title:' (offset %d) must appear before 'id:' (offset %d) in template output:\n%s", titleIdx, idIdx, got)
-	}
-}
-
 // TestNewTemplateStatesComment verifies that the rendered template includes the
 // states hint comment below the status field.
 func TestNewTemplateStatesComment(t *testing.T) {
 	t.Parallel()
 
-	fixedTime := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
-	b, err := template.New(testID, fixedTime, "task")
+	b, err := template.New(fixedTime, "task")
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
