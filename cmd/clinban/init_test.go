@@ -92,14 +92,17 @@ func TestInitAlreadyExists_NoForce(t *testing.T) {
 	if exitCode != 1 {
 		t.Errorf("exit code = %d, want 1; stdout=%q stderr=%q", exitCode, stdout, stderr)
 	}
-	if !strings.Contains(stderr, "tickets/") {
-		t.Errorf("stderr does not mention tickets/: %q", stderr)
+	if !strings.Contains(stderr, "already exists: tickets/") {
+		t.Errorf("stderr does not mention existing tickets/: %q", stderr)
 	}
-	if !strings.Contains(stderr, "tickets/archive/") {
-		t.Errorf("stderr does not mention tickets/archive/: %q", stderr)
+	if !strings.Contains(stderr, "already exists: tickets/archive/") {
+		t.Errorf("stderr does not mention existing tickets/archive/: %q", stderr)
 	}
-	if !strings.Contains(stderr, ".clinban") {
-		t.Errorf("stderr does not mention .clinban: %q", stderr)
+	if !strings.Contains(stderr, "already exists: .clinban") {
+		t.Errorf("stderr does not mention existing .clinban: %q", stderr)
+	}
+	if !strings.Contains(stderr, "missing: SCHEMA.md") {
+		t.Errorf("stderr does not list missing SCHEMA.md: %q", stderr)
 	}
 }
 

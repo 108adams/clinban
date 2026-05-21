@@ -94,6 +94,18 @@ func runInit(flags initFlags) error {
 			if schemaExists {
 				fmt.Fprintln(os.Stderr, "already exists: SCHEMA.md")
 			}
+			if !ticketsExists {
+				fmt.Fprintln(os.Stderr, "missing: tickets/")
+			}
+			if !archiveExists {
+				fmt.Fprintln(os.Stderr, "missing: tickets/archive/")
+			}
+			if !configExists {
+				fmt.Fprintln(os.Stderr, "missing: .clinban")
+			}
+			if !schemaExists {
+				fmt.Fprintln(os.Stderr, "missing: SCHEMA.md")
+			}
 			fmt.Fprintln(os.Stderr, "re-run with --force to create missing items")
 			return fmt.Errorf("init: project already partially or fully initialized")
 		}
