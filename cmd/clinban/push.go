@@ -10,6 +10,7 @@ import (
 
 	"github.com/108adams/clinban/internal/fsm"
 	"github.com/108adams/clinban/internal/store"
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 var pushCmd = &cobra.Command{
@@ -43,7 +44,11 @@ func runPush(_ *cobra.Command, args []string) error {
 
 	next, ok := fsm.NextStatus(t.Status)
 	if !ok {
-		fmt.Fprintf(os.Stdout, "ticket %s is already at the final status (%s)\n", t.ID, t.Status)
+		if t.Status != ticket.StatusDone {
+			fmt.Fprintf(os.Stderr, "ticket %s has unrecognised status %q\n", t.ID, t.Status)
+			return ExitError{Code: 1, Err: fmt.Errorf("push: unrecognised status %q", t.Status)}
+		}
+		fmt.Fprintf(os.Stdout, "ticket %s is already done\n", t.ID)
 		return nil
 	}
 

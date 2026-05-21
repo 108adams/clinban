@@ -122,14 +122,13 @@ func TestPushFromBlocked(t *testing.T) {
 	}
 }
 
-// TestPushFromDone verifies that a done ticket (in the active directory) exits 0
-// and stdout contains "final status".
+// TestPushFromDone verifies that a done ticket exits 0 and stdout contains
+// "already done".
 func TestPushFromDone(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
 	root, ticketsDir, _ := setupWorkDir(t)
 
-	// Create a done ticket directly in the active tickets directory.
 	writeTicket(t, ticketsDir, pushTestFile, pushTicketContent(pushTestID, "done"))
 
 	stdout, stderr, code := runPush(t, bin, root, pushTestID)
@@ -137,8 +136,27 @@ func TestPushFromDone(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
 	}
-	if !strings.Contains(stdout, "final status") {
-		t.Errorf("stdout = %q, want to contain %q", stdout, "final status")
+	if !strings.Contains(stdout, "already done") {
+		t.Errorf("stdout = %q, want to contain %q", stdout, "already done")
+	}
+}
+
+// TestPushUnknownStatus verifies that a ticket with an unrecognised status exits 1
+// and reports schema corruption rather than silently treating it as final.
+func TestPushUnknownStatus(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	root, ticketsDir, _ := setupWorkDir(t)
+
+	writeTicket(t, ticketsDir, pushTestFile, pushTicketContent(pushTestID, "triaged"))
+
+	_, stderr, code := runPush(t, bin, root, pushTestID)
+
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1", code)
+	}
+	if !strings.Contains(stderr, "unrecognised status") {
+		t.Errorf("stderr = %q, want to contain %q", stderr, "unrecognised status")
 	}
 }
 
