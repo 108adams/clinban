@@ -62,6 +62,8 @@ func Execute() {
 		if errors.As(err, &exitErr) {
 			os.Exit(exitErr.Code)
 		}
+		fmt.Fprintf(os.Stderr, "clinban: %v\n\n", err)
+		_ = rootCmd.Help()
 		os.Exit(1)
 	}
 }
