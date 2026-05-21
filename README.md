@@ -15,6 +15,7 @@ agents need to read the same work queue.
 - The schema is stable enough for automation.
 - The CLI handles IDs, timestamps, status moves, archiving, and linting.
 - Your project keeps its own work history without depending on an issue tracker.
+- A Claude Code `/tickets` skill ships with the board for LLM-native board operations.
 
 ## Install
 

@@ -13,6 +13,12 @@ links:
 
 # Documentation Log
 
+## [2026-05-21] update | Document /tickets skill as product deliverable
+
+- Source: `.claude/skills/tickets/SKILL.md`, conversation
+- Updated: `docs/product.md`, `README.md`
+- Notes: Added "LLM Interface" section to product.md and a bullet to README; establishes the skill as a co-deliverable with the CLI.
+
 ## [2026-05-19] scaffold | Wiki core
 
 - Source: `wiki.md`, user discussion

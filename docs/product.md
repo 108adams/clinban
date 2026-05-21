@@ -3,7 +3,7 @@ title: Product Overview
 kind: overview
 scope: project
 summary: Describes Clinban's product purpose, users, boundaries, and ecosystem role.
-updated: 2026-05-19
+updated: 2026-05-21
 links:
   - cli
   - ticket-schema
@@ -47,6 +47,13 @@ The stable product surface is:
 - Active and archived ticket directories.
 - Linting for schema integrity.
 - Search and filtering through list flags.
+- A Claude Code `/tickets` skill for LLM-native board operations.
+
+## LLM Interface
+
+Clinban ships a Claude Code skill at `.claude/skills/tickets/SKILL.md`. It is a co-deliverable with the CLI: when CLI behavior changes, the skill is updated in the same commit.
+
+The skill provides the LLM-native board interface — ticket discovery, creation, status transitions, body editing, and the close-after-commit sequence — on top of `SCHEMA.md`, which it delegates to for field-level detail. Invoke it with `/tickets` in Claude Code.
 
 ## Ecosystem Role
 
