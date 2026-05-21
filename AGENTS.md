@@ -84,6 +84,21 @@ When behavior changes:
 
 Use the `librarian` Codex skill for documentation wiki work when available. The wiki schema is in `docs/schema.md`.
 
+## Definition of Done
+
+Every implementation task must end with a documentation relevance check. Before
+handing work back, verify that the maintained wiki still reflects the current
+behavior, package responsibilities, commands, validation rules, storage model,
+and testing workflow touched by the task.
+
+If the wiki is stale, updating it is part of the task, not optional follow-up
+work. This includes updating the relevant `docs/` page, `docs/index.md` when
+navigation changes, `docs/log.md` for the documentation maintenance record, and
+`cmd/clinban/schema.md` when generated `SCHEMA.md` guidance is affected.
+
+When the implementation does not require documentation changes, say that the
+wiki was checked and why no update was needed.
+
 ## Validation Commands
 
 In this workspace, use a writable Go build cache by default. The normal cache
