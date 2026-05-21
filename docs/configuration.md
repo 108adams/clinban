@@ -50,6 +50,19 @@ Relative paths are resolved against the project root. Absolute paths are used as
 
 The CLI walks upward from the current working directory looking for `.clinban`. If no config file is found, the current working directory is treated as the project root.
 
+## Editing Configuration
+
+Config keys can be viewed and set from the command line using [`clinban config`](cli.md#clinban-config-keyvalue). This is the recommended way to modify `.clinban` without editing it by hand.
+
+```bash
+# View all keys and their current values
+clinban config
+
+# Set a key
+clinban config tickets_dir=work
+clinban config default_type=task
+```
+
 ## Malformed Config
 
 If `.clinban` exists but cannot be parsed as TOML, Clinban exits with an error.

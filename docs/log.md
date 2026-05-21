@@ -85,6 +85,12 @@ links:
 - Updated: `docs/cli.md`, `docs/log.md`
 - Notes: Empty titles and other lint failures now trigger the re-open prompt before a managed ticket file is created; declining the prompt exits 1 and leaves no invalid ticket behind.
 
+## [2026-05-21] feature | clinban config command
+
+- Source: `internal/config/config.go`, `cmd/clinban/config.go`, `cmd/clinban/config_test.go`
+- Updated: `docs/cli.md`, `docs/configuration.md`, `docs/log.md`
+- Notes: Added `clinban config` subcommand. No-args mode lists all three known keys with values, defaults, and set/not-set notes. Single `key=value` arg sets the key in `.clinban`, creating the file if absent, with validation for unknown keys, invalid `default_type` values, and empty path values.
+
 ## [2026-05-20] update | GitHub migration — module path and CI
 
 - Source: migration commit `6a0cd17`

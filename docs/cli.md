@@ -142,6 +142,39 @@ Validates one ticket or all tickets. With no argument, active and archived ticke
 
 Lint exits silently with code `0` when no errors are found.
 
+## `clinban config [key=value]`
+
+Views or sets configuration values stored in `.clinban`.
+
+**No arguments** — lists all known configuration keys. For keys explicitly set in `.clinban`, shows the stored value. For keys not set, shows the built-in default with a note:
+
+```
+tickets_dir = tickets         (not set in .clinban, default: tickets)
+archive_dir = tickets/archive (not set in .clinban, default: tickets/archive)
+default_type =                (not set in .clinban, no default)
+```
+
+When a key is set in `.clinban`:
+
+```
+tickets_dir = mydir
+```
+
+**One `key=value` argument** — sets the key in `.clinban`. Creates the file if absent.
+
+Valid keys:
+
+| Key | Valid values | Default |
+|---|---|---|
+| `tickets_dir` | Any non-empty path | `tickets` |
+| `archive_dir` | Any non-empty path | `<tickets_dir>/archive` |
+| `default_type` | `bug`, `task`, `feature`, `spike`, or empty string to unset | _(none)_ |
+
+Exit codes:
+
+- `0` — success
+- `1` — unknown key, invalid value, or missing `=` in argument
+
 ## `clinban completion <shell>`
 
 Clinban uses Cobra, so it can generate shell completion scripts.
