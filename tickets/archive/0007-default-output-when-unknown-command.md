@@ -1,6 +1,6 @@
 ---
 id: "0007"
-status: "in-progress"
+status: "done"
 type: "feature"
 # types: bug, task, feature, spike
 title: "default output when unknown command requested"

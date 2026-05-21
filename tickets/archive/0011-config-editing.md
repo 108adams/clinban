@@ -1,12 +1,11 @@
 ---
 id: "0011"
-status: "backlog"
-type: "feature"
-# types: bug, task, feature, spike
-title: "config editing"
+status: done
+type: feature
+title: config editing
 tags: []
-created: "2026-05-21T11:13:32+02:00"
-updated: "2026-05-21T11:13:32+02:00"
+created: 2026-05-21T11:13:32+02:00
+updated: 2026-05-21T12:28:29.756745216+02:00
 ---
 add `config` command
 
