@@ -61,6 +61,12 @@ links:
 - Updated: `docs/cli.md`, `docs/configuration.md`, `docs/log.md`, `CHANGELOG`
 - Notes: Documented `clinban push`, body-arg behavior for `clinban new`, `default_type` config field, SCHEMA.md init artifact, partial-init missing-items output, and inline type hint in the ticket template.
 
+## [2026-05-21] update | End-to-end testing strategy
+
+- Source: maintainer discussion
+- Updated: `docs/development.md`, `docs/log.md`
+- Notes: Added E2E testing guidance for black-box CLI scenarios, fake editors, PTY use, subprocess coverage, and when to consider testscript.
+
 ## [2026-05-20] update | GitHub migration — module path and CI
 
 - Source: migration commit `6a0cd17`
