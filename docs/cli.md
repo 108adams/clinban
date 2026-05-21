@@ -26,7 +26,7 @@ Initializes a Clinban project in the current directory by creating four artifact
 - `.clinban` — TOML configuration file
 - `SCHEMA.md` — human/LLM-readable reference for the ticket format, field constraints, status transitions, and agent operations
 
-Each created artifact is reported on stdout (`created: tickets/`, etc.). If any artifact already exists, the command exits `1` and lists each conflict on stderr.
+Each created artifact is reported on stdout (`created: tickets/`, etc.). If any artifact already exists without `--force`, the command exits `1` and lists both the conflicting artifacts and the missing ones on stderr, so the user can see exactly what needs to be created.
 
 Optional flags:
 
@@ -37,6 +37,14 @@ Optional flags:
 ## `clinban new`
 
 Creates a ticket interactively. Clinban renders a template with system fields, opens `$EDITOR` with fallback to `vi`, and writes the resulting ticket when the user provides a title.
+
+Optional positional arguments are joined and pre-filled as the body:
+
+```text
+clinban new "Investigate the memory leak in the worker pool"
+```
+
+The editor opens with the body already present; the user only needs to fill in the title and type.
 
 If the title remains empty, the ticket is discarded.
 
@@ -100,6 +108,19 @@ If parse or lint fails, the user is prompted to reopen the editor. Declining exi
 Transitions a ticket status through the state machine. Invalid transitions are rejected with a list of valid next statuses.
 
 Moving a done archived ticket back to `backlog` writes the updated ticket into the active directory before removing the archived copy.
+
+## `clinban push <id>`
+
+Advances a ticket one step forward through the workflow without specifying the target status:
+
+| Current status | After push |
+|---|---|
+| `backlog` | `in-progress` |
+| `in-progress` | `done` |
+| `blocked` | `in-progress` |
+| `done` | _(no change — exits `0` with a message)_ |
+
+Exits `0` in all non-error cases, including when the ticket is already `done`.
 
 ## `clinban archive [id]`
 

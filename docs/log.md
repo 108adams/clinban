@@ -55,6 +55,12 @@ links:
 - Updated: `docs/cli.md`, `docs/log.md`
 - Notes: `clinban init` now creates a fourth artifact, `SCHEMA.md`, at the project root. The file is a static Markdown schema reference for LLM agents and human contributors; it covers ticket format, field constraints, status transitions, and step-by-step agent operations.
 
+## [2026-05-21] update | clinban push, new body args, default_type, init improvements
+
+- Source: commits `9aa4134`–`c41d3fb` (tickets 0001–0003, 0005–0006, 0008)
+- Updated: `docs/cli.md`, `docs/configuration.md`, `docs/log.md`, `CHANGELOG`
+- Notes: Documented `clinban push`, body-arg behavior for `clinban new`, `default_type` config field, SCHEMA.md init artifact, partial-init missing-items output, and inline type hint in the ticket template.
+
 ## [2026-05-20] update | GitHub migration — module path and CI
 
 - Source: migration commit `6a0cd17`

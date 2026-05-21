@@ -3,6 +3,27 @@ Clinban — Development Changelog
 Most recent entries appear first.
 
 ────────────────────────────────────────────────────────────────────────────────
+2026-05-21  clinban push, extended new, default type, and SCHEMA.md
+
+  clinban push <id> advances a ticket one step forward through the workflow
+  (backlog→in-progress, in-progress→done, blocked→in-progress). Exits 0 with
+  an informational message when the ticket is already at the final status.
+
+  clinban new now accepts optional positional arguments as body text. The
+  editor opens with the body pre-filled; the user only needs to supply a title.
+
+  default_type in .clinban pre-fills the type field in the interactive template
+  and makes --type optional for --no-interactive creation.
+
+  clinban init creates a fourth artifact, SCHEMA.md, at the project root — a
+  human/LLM-readable reference covering ticket format, field constraints, status
+  transitions, and agent operation instructions. Partial-init output now lists
+  both existing and missing artifacts.
+
+  The interactive ticket template shows a comment listing valid type values
+  directly below the type field.
+
+────────────────────────────────────────────────────────────────────────────────
 2026-05-19  Project initialization command
 
   clinban init creates the ticket directory, archive directory, and .clinban
