@@ -128,18 +128,6 @@ func runNewInteractive(body string) error {
 		return ExitError{Code: 1, Err: fmt.Errorf("new: parse ticket: %w", err)}
 	}
 
-	// Detect discard: title is still the empty placeholder.
-	if t.Title == "" {
-		_ = os.Remove(tmpPath)
-		fmt.Println("Ticket discarded.")
-		return nil
-	}
-
-	// Compute final path.
-	titleSlug := slug.Slugify(t.Title)
-	finalPath := st.TicketPath(nextID, titleSlug)
-	filename := filepath.Base(finalPath)
-
 	// Collect existing IDs before the Rename so the new ticket is not yet
 	// visible to the disk scan. AllIDs must be called here — after Rename the
 	// new file lands on disk and the subsequent append would double-count its
@@ -153,14 +141,11 @@ func runNewInteractive(body string) error {
 	idStr := fmt.Sprintf("%04d", nextID)
 	allIDsWithNew := append(allIDs, idStr) //nolint:gocritic // intentional copy via append
 
-	// Move temp file to final location (regardless of lint state).
-	if err := os.Rename(tmpPath, finalPath); err != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("new: rename to final path: %w", err)
-	}
-
-	// Lint/re-open loop.
+	// Lint/re-open loop. The ticket is still in the temp file here, so invalid
+	// frontmatter cannot create a managed ticket with a bad filename such as
+	// "0001-.md".
 	for {
+		filename := filepath.Base(st.TicketPath(nextID, slug.Slugify(t.Title)))
 		lintErrs := lint.Lint(t, filename, allIDsWithNew)
 		if len(lintErrs) == 0 {
 			break
@@ -173,16 +158,16 @@ func runNewInteractive(body string) error {
 		fmt.Fprint(os.Stderr, "Re-open in editor? [y/N] ")
 		answer := readLine(os.Stdin)
 		if answer != "y" && answer != "Y" {
-			break
+			_ = os.Remove(tmpPath)
+			return ExitError{Code: 1, Err: fmt.Errorf("new: lint failed")}
 		}
 
-		// Re-open the file now at finalPath.
-		if err := editor.Open(finalPath); err != nil {
+		if err := editor.Open(tmpPath); err != nil {
 			return fmt.Errorf("new: editor re-open: %w", err)
 		}
 
 		// Re-read and re-parse.
-		content, err = os.ReadFile(finalPath)
+		content, err = os.ReadFile(tmpPath)
 		if err != nil {
 			return fmt.Errorf("new: read after re-open: %w", err)
 		}
@@ -190,6 +175,17 @@ func runNewInteractive(body string) error {
 		if err != nil {
 			return fmt.Errorf("new: parse after re-open: %w", err)
 		}
+	}
+
+	// Compute final path after the ticket has passed lint, because the title may
+	// have changed during the re-open loop.
+	titleSlug := slug.Slugify(t.Title)
+	finalPath := st.TicketPath(nextID, titleSlug)
+	filename := filepath.Base(finalPath)
+
+	if err := os.Rename(tmpPath, finalPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("new: rename to final path: %w", err)
 	}
 
 	fmt.Printf("created: %s\n", filename)

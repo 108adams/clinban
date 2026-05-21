@@ -17,6 +17,8 @@ Clinban commands operate on the configured active and archive ticket directories
 
 Normal output goes to stdout. User-facing errors go to stderr, except lint violations, which are normal validation output and go to stdout. Exit code `0` means success; exit code `1` means an error or validation failure.
 
+If an unrecognised command is given (e.g. `clinban view`), Clinban prints an "unknown command" error to stderr, displays the root help to stdout, and exits with code `1`.
+
 ## `clinban init`
 
 Initializes a Clinban project in the current directory by creating four artifacts:
@@ -38,6 +40,8 @@ Optional flags:
 
 Creates a ticket interactively. Clinban renders a template with system fields, opens `$EDITOR` with fallback to `vi`, and writes the resulting ticket when the user provides a title.
 
+`$EDITOR` may include arguments. For common GUI editors that return before the file is saved unless instructed to wait, Clinban adds the editor's wait flag automatically.
+
 Optional positional arguments are joined and pre-filled as the body:
 
 ```text
@@ -46,9 +50,11 @@ clinban new "Investigate the memory leak in the worker pool"
 
 The editor opens with the body already present; the user only needs to fill in the title and type.
 
-If the title remains empty, the ticket is discarded.
+If lint errors remain after editing, including an empty title, Clinban prompts
+to reopen the editor before creating the managed ticket. Declining the prompt
+exits with code `1` and leaves no ticket file behind.
 
-If lint errors remain after creation, the ticket may still be written and the user is prompted to reopen the editor.
+The ticket is written only after the edited frontmatter parses and passes lint.
 
 ## `clinban new --no-interactive`
 
@@ -100,6 +106,8 @@ Prints one ticket in a human-readable format. It does not modify files. Archived
 ## `clinban edit <id>`
 
 Opens a ticket in `$EDITOR`. Clinban edits a temporary copy and replaces the live ticket only after parse and lint both pass.
+
+`$EDITOR` handling is the same as `clinban new`, including support for editor arguments and automatic wait flags for common GUI editors.
 
 If parse or lint fails, the user is prompted to reopen the editor. Declining exits with code `1` and leaves the original ticket unchanged.
 

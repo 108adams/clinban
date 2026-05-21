@@ -540,6 +540,29 @@ func makeEditorScript(t *testing.T, dir, title, ticketType string) string {
 	return scriptPath
 }
 
+// makeCodeEditorScript writes a fake code executable. It only edits the file
+// when Clinban invokes it with --wait, matching GUI editors that otherwise
+// return before the user has saved the temporary ticket.
+func makeCodeEditorScript(t *testing.T, dir, title, ticketType string) string {
+	t.Helper()
+	script := "#!/bin/sh\n" +
+		"set -e\n" +
+		"wait_seen=0\n" +
+		"target=\"\"\n" +
+		"for arg in \"$@\"; do\n" +
+		"  if [ \"$arg\" = \"--wait\" ]; then wait_seen=1; else target=\"$arg\"; fi\n" +
+		"done\n" +
+		"if [ \"$wait_seen\" -eq 0 ]; then exit 0; fi\n" +
+		"sed -i 's|title: \"\"|title: \"" + title + "\"|' \"$target\"\n" +
+		"sed -i 's|type: \"\"|type: \"" + ticketType + "\"|' \"$target\"\n" +
+		"exit 0\n"
+	scriptPath := filepath.Join(dir, "code")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o700); err != nil {
+		t.Fatalf("makeCodeEditorScript: %v", err)
+	}
+	return scriptPath
+}
+
 // makeDiscardEditorScript writes a script that does NOT modify the file
 // (simulates the user opening and closing without any changes).
 func makeDiscardEditorScript(t *testing.T, dir string) string {
@@ -646,9 +669,37 @@ func TestNewInteractiveHappyPath(t *testing.T) {
 	}
 }
 
-// TestNewInteractiveDiscard verifies that when $EDITOR does not change the
-// template, no ticket file is written and "Ticket discarded." is printed.
-func TestNewInteractiveDiscard(t *testing.T) {
+// TestNewInteractiveCodeEditorWaits verifies the common GUI-editor failure mode
+// where EDITOR=code returns before the temp file is saved unless --wait is used.
+func TestNewInteractiveCodeEditorWaits(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	root, ticketsDir, _ := setupWorkDir(t)
+	scriptDir := t.TempDir()
+
+	editor := makeCodeEditorScript(t, scriptDir, interactiveTestTitle, interactiveTestType)
+
+	stdout, stderr, code := runNewInteractive(t, bin, root, editor, "")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if strings.Contains(stdout, "Ticket discarded.") {
+		t.Fatalf("ticket was discarded; stdout=%q stderr=%q", stdout, stderr)
+	}
+
+	wantFile := fmt.Sprintf("%s-%s.md", interactiveTestID, interactiveTestSlug)
+	if !strings.Contains(stdout, wantFile) {
+		t.Errorf("stdout = %q, want to contain %q", stdout, wantFile)
+	}
+	if _, err := os.Stat(filepath.Join(ticketsDir, wantFile)); os.IsNotExist(err) {
+		t.Errorf("ticket file %q not found", wantFile)
+	}
+}
+
+// TestNewInteractiveEmptyTitlePromptsReopen verifies that an unchanged title is
+// handled as a lint error with a re-open prompt, not silently discarded.
+func TestNewInteractiveEmptyTitlePromptsReopen(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
 	root, ticketsDir, _ := setupWorkDir(t)
@@ -658,15 +709,18 @@ func TestNewInteractiveDiscard(t *testing.T) {
 
 	stdout, stderr, code := runNewInteractive(t, bin, root, editor, "")
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1; stdout=%q stderr=%q", code, stdout, stderr)
 	}
 
-	if !strings.Contains(stdout+stderr, "discarded") {
-		t.Errorf("expected 'discarded' in output; stdout=%q stderr=%q", stdout, stderr)
+	combined := stdout + stderr
+	if strings.Contains(combined, "discarded") {
+		t.Errorf("unexpected discard output; stdout=%q stderr=%q", stdout, stderr)
+	}
+	if !strings.Contains(combined, "title") || !strings.Contains(combined, "Re-open") {
+		t.Errorf("expected title lint error and re-open prompt; stdout=%q stderr=%q", stdout, stderr)
 	}
 
-	// No ticket files should exist in ticketsDir.
 	entries, err := os.ReadDir(ticketsDir)
 	if err != nil {
 		t.Fatal(err)
@@ -680,8 +734,8 @@ func TestNewInteractiveDiscard(t *testing.T) {
 
 // TestNewInteractiveLintErrorPromptsReopen verifies that when the editor
 // produces lint errors, errors are listed and the user is prompted to re-open.
-// The user declines (inputs "n"), so the file is still written and the command
-// exits 0.
+// The user declines (inputs "n"), so no managed ticket is written and the
+// command exits 1.
 func TestNewInteractiveLintErrorPromptsReopen(t *testing.T) {
 	t.Parallel()
 	bin := buildBinary(t)
@@ -694,8 +748,8 @@ func TestNewInteractiveLintErrorPromptsReopen(t *testing.T) {
 	// User declines re-open with "n".
 	stdout, stderr, code := runNewInteractive(t, bin, root, editor, "n\n")
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1; stdout=%q stderr=%q", code, stdout, stderr)
 	}
 
 	// Lint errors should be mentioned in output.
@@ -709,7 +763,6 @@ func TestNewInteractiveLintErrorPromptsReopen(t *testing.T) {
 		t.Errorf("expected re-open prompt; stdout=%q stderr=%q", stdout, stderr)
 	}
 
-	// The ticket file must still exist in ticketsDir (written regardless of lint).
 	entries, err := os.ReadDir(ticketsDir)
 	if err != nil {
 		t.Fatal(err)
@@ -720,8 +773,8 @@ func TestNewInteractiveLintErrorPromptsReopen(t *testing.T) {
 			mdFiles = append(mdFiles, e.Name())
 		}
 	}
-	if len(mdFiles) == 0 {
-		t.Error("expected ticket file to exist after lint-error path (written regardless of lint)")
+	if len(mdFiles) != 0 {
+		t.Errorf("unexpected ticket files after declined lint repair: %v", mdFiles)
 	}
 }
 

@@ -67,6 +67,24 @@ links:
 - Updated: `docs/development.md`, `docs/log.md`
 - Notes: Added E2E testing guidance for black-box CLI scenarios, fake editors, PTY use, subprocess coverage, and when to consider testscript.
 
+## [2026-05-21] fix | Unknown command shows help (ticket 0007)
+
+- Source: `cmd/clinban/root.go`, `cmd/clinban/root_test.go`
+- Updated: `docs/cli.md`, `docs/log.md`
+- Notes: `clinban <unknown>` now prints an "unknown command" error to stderr, displays root help to stdout, and exits 1 instead of silently failing.
+
+## [2026-05-21] fix | Interactive new waits for GUI editors
+
+- Source: `internal/editor/editor.go`, `internal/editor/editor_test.go`, `cmd/clinban/new_test.go`
+- Updated: `docs/cli.md`, `docs/log.md`
+- Notes: Documented editor command arguments and automatic wait flags for common GUI editors so interactive `new` and `edit` do not read unchanged temp files before save.
+
+## [2026-05-21] fix | Interactive new validates before writing
+
+- Source: `cmd/clinban/new.go`, `cmd/clinban/new_test.go`
+- Updated: `docs/cli.md`, `docs/log.md`
+- Notes: Empty titles and other lint failures now trigger the re-open prompt before a managed ticket file is created; declining the prompt exits 1 and leaves no invalid ticket behind.
+
 ## [2026-05-20] update | GitHub migration — module path and CI
 
 - Source: migration commit `6a0cd17`
