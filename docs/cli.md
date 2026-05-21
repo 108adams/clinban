@@ -53,7 +53,7 @@ clinban new --no-interactive --title "Fix login" --type bug --tags auth,backend 
 Required flags:
 
 - `--title`
-- `--type`
+- `--type` — required unless `default_type` is set to a valid type in `.clinban`
 
 Optional flags:
 

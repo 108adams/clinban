@@ -120,16 +120,14 @@ Archived tickets use the same filename pattern and are stored in `archive_dir`.
 
 ## 5. Status Transitions
 
-`status` must progress along this directed graph. Only the five edges listed
+`status` must progress along this directed graph. Only the six edges listed
 below are valid; any other transition is rejected by `clinban move`.
 
 ```
 backlog ──► in-progress ──► done ──► backlog
-                │                      ▲
-                ▼                      │
-            blocked ──────────────────►┘
-              │
-              └──────────────► in-progress
+  │              │
+  │              ▼
+  └──────────► blocked ──► in-progress
 ```
 
 Valid transitions:
@@ -137,6 +135,7 @@ Valid transitions:
 | From | To | Meaning |
 |------|----|---------|
 | `backlog` | `in-progress` | Work has started |
+| `backlog` | `blocked` | Ticket is blocked before work begins |
 | `in-progress` | `blocked` | Work is stalled on an external dependency |
 | `in-progress` | `done` | Work is complete |
 | `blocked` | `in-progress` | Blocker resolved; work resuming |
@@ -154,30 +153,25 @@ Follow these steps exactly. Do not skip or reorder steps.
 ### 6.1 Create a ticket
 
 1. Read `.clinban` to find `tickets_dir`.
-2. Run `clinban new --title "<title>" --type <type> [--tags tag1,tag2]`.
-   - `<type>` must be one of: `bug`, `task`, `feature`, `spike`.
-   - Tags are optional and comma-separated.
+2. Run `clinban new --no-interactive --title "<title>" --type <type> [--tags tag1,tag2] [--body "<body>"]`.
+   - `--no-interactive` is required for non-interactive/agent use; without it the
+     command opens `$EDITOR` and blocks.
+   - `<type>` must be one of: `bug`, `task`, `feature`, `spike`. If `default_type`
+     is set to a valid type in `.clinban`, `--type` may be omitted.
+   - `--tags` is optional and comma-separated.
+   - `--body` is optional Markdown body text.
 3. The command prints the new ticket's filename to stdout (e.g.
    `created: 0043-my-new-ticket.md`). Record the ID from that filename.
-4. To add a body, open the file at `<tickets_dir>/<filename>` and append
-   Markdown below the closing `---` of the frontmatter. Do not edit the
-   frontmatter fields.
 
 ### 6.2 Update a ticket
 
-To change `title`, `type`, or `tags`:
-
-1. Run `clinban edit <id> --title "<new title>"` (and/or `--type <new type>`,
-   `--tags tag1,tag2`).
-2. Clinban updates the frontmatter and refreshes `updated`.
-
-To change the body only:
-
-1. Open the file at `<tickets_dir>/<id>-<slug>.md` (use `clinban show <id>` or
-   list the directory to find the exact filename).
-2. Edit the Markdown content below the closing `---`.
-3. Do not modify any frontmatter field — Clinban owns `id`, `created`, and
-   `updated`; changing them manually produces an inconsistent state.
+1. Run `clinban edit <id>`.
+2. Clinban opens the ticket in `$EDITOR` on a temporary copy.
+3. Edit the desired frontmatter fields (`type`, `title`, `tags`) or the body.
+4. Save and close the editor. Clinban validates the result and writes the ticket
+   only if parse and lint pass; on failure it prompts to reopen.
+5. Do not modify `id`, `created`, or `updated` — Clinban owns these fields and
+   refreshes `updated` automatically on every write.
 
 ### 6.3 Move status
 

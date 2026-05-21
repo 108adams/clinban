@@ -68,8 +68,13 @@ func runNewInteractive(body string) error {
 
 	now := time.Now()
 
-	// Render the template.
-	tmplBytes, err := template.New(nextID, now, cfg.DefaultType)
+	// Render the template. Only pass the default type when it is a valid type
+	// value; an invalid or empty config value renders as an empty type field.
+	defType := cfg.DefaultType
+	if !ticket.Type(defType).Valid() {
+		defType = ""
+	}
+	tmplBytes, err := template.New(nextID, now, defType)
 	if err != nil {
 		return fmt.Errorf("new: render template: %w", err)
 	}
