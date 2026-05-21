@@ -40,6 +40,21 @@ func ValidateTransition(from, to ticket.Status) error {
 	)
 }
 
+// NextStatus returns the next forward status for the push command.
+// Returns ("", false) when from is the terminal push status (done) or unknown.
+func NextStatus(from ticket.Status) (ticket.Status, bool) {
+	switch from {
+	case ticket.StatusBacklog:
+		return ticket.StatusInProgress, true
+	case ticket.StatusInProgress:
+		return ticket.StatusDone, true
+	case ticket.StatusBlocked:
+		return ticket.StatusInProgress, true
+	default:
+		return "", false
+	}
+}
+
 // joinStatuses returns a comma-separated string of status values.
 func joinStatuses(statuses []ticket.Status) string {
 	parts := make([]string, len(statuses))

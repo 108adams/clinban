@@ -6,31 +6,46 @@ _Input: pipeline/03_design.md_
 
 ## Task List
 
-### TASK-001: Accept body args in clinban new interactive path
+### TASK-001: Add NextStatus to internal/fsm
 
-- **Description:** Allow `clinban new [body...]` to accept optional positional arguments.
-  Join them as body text and pre-fill the temp file below the frontmatter before opening
-  the editor.
-- **Module(s):** `cmd/clinban/new.go`, `cmd/clinban/new_test.go`
+- **Description:** Add a `NextStatus(from ticket.Status) (ticket.Status, bool)` function to `internal/fsm/fsm.go` that returns the next forward status for the push command.
+- **Module(s):** `internal/fsm/fsm.go`, `internal/fsm/fsm_test.go`
 - **Done criteria:**
-  - [ ] `newCmd` has `Args: cobra.ArbitraryArgs`
-  - [ ] `runNew` signature is `func runNew(cmd *cobra.Command, args []string) error`; passes `strings.Join(args, " ")` to `runNewInteractive`
-  - [ ] `runNewInteractive` signature is `func runNewInteractive(body string) error`
-  - [ ] When `body != ""`, `"\n" + body + "\n"` is written to the temp file after the template bytes, before the file is closed
-  - [ ] `TestNewInteractiveWithBodyArgs`: runs `clinban new "body text here"` with a fake editor that sets a title; asserts exit 0 and the created ticket file body contains `"body text here"`
-  - [ ] `TestNewInteractiveNoArgsUnchanged`: runs `clinban new` (no args) using existing editor script; asserts existing happy-path behaviour still works
-  - [ ] All existing `new` tests pass
+  - [ ] `NextStatus` function exists in `internal/fsm`
+  - [ ] `NextStatus(StatusBacklog)` returns `(StatusInProgress, true)`
+  - [ ] `NextStatus(StatusInProgress)` returns `(StatusDone, true)`
+  - [ ] `NextStatus(StatusBlocked)` returns `(StatusInProgress, true)`
+  - [ ] `NextStatus(StatusDone)` returns `("", false)`
+  - [ ] Table-driven test covers all four cases
+  - [ ] `go test ./internal/fsm/...` passes
+  - [ ] `go vet ./internal/fsm/...` clean
+- **Depends on:** none
+
+---
+
+### TASK-002: Add cmd/clinban/push.go
+
+- **Description:** Create a new `push` command that advances a ticket one step in the forward direction using `fsm.NextStatus`.
+- **Module(s):** `cmd/clinban/push.go` (new), `cmd/clinban/push_test.go` (new)
+- **Done criteria:**
+  - [ ] `push.go` defines `pushCmd` with `Use: "push <id>"`, `Args: cobra.ExactArgs(1)`, `SilenceUsage: true`
+  - [ ] `runPush` finds ticket by ID (exit 1 + stderr "ticket not found" on missing)
+  - [ ] `runPush` calls `fsm.NextStatus`; when `ok == false`, prints `"ticket <id> is already at the final status (<status>)\n"` to stdout and returns nil (exit 0)
+  - [ ] When `ok == true`: updates `t.Status` and `t.Updated`, writes ticket, prints `"ticket <id> moved to <next>\n"` to stdout
+  - [ ] `TestPushFromBacklog`: backlog ticket → exits 0, stdout "moved to in-progress", file has `status: in-progress`
+  - [ ] `TestPushFromInProgress`: in-progress ticket → exits 0, stdout "moved to done"
+  - [ ] `TestPushFromBlocked`: blocked ticket → exits 0, stdout "moved to in-progress"
+  - [ ] `TestPushFromDone`: done ticket → exits 0, stdout "final status"
+  - [ ] `TestPushTicketNotFound`: unknown id → exits 1, stderr "not found"
   - [ ] `go test ./cmd/clinban/...` passes
   - [ ] `go vet ./cmd/clinban/...` clean
-- **Depends on:** none
-- **Notes:**
-  - Use the existing `makeEditorScript` / `runNewInteractive` test helpers — read the test file before writing new tests.
-  - The fake editor for `TestNewInteractiveWithBodyArgs` only needs to set the title (body already present in the file); it must NOT overwrite the body. The existing `makeEditorScript` uses sed to set `title:` and `type:` lines — it leaves the body untouched, so it can be reused directly.
-  - Positional args with `--no-interactive` are silently ignored — no test needed for that path.
-  - `strings` is already imported in `new.go`.
+- **Depends on:** TASK-001
 
 ---
 
 ## Dependency Order
 
-Single task. No dependencies.
+```
+TASK-001 (internal/fsm NextStatus)
+    └── TASK-002 (cmd/clinban/push.go)
+```

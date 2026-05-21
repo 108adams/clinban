@@ -202,3 +202,36 @@ func TestValidateTransition_CountInvalid(t *testing.T) {
 		t.Errorf("invalidTransitionCases has %d entries, want %d", len(invalidTransitionCases), wantCount)
 	}
 }
+
+// TestNextStatus covers all four documented cases for the push forward-progression.
+func TestNextStatus(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		from     ticket.Status
+		wantNext ticket.Status
+		wantOK   bool
+	}{
+		{name: "backlog to in-progress", from: ticket.StatusBacklog, wantNext: ticket.StatusInProgress, wantOK: true},
+		{name: "in-progress to done", from: ticket.StatusInProgress, wantNext: ticket.StatusDone, wantOK: true},
+		{name: "blocked to in-progress", from: ticket.StatusBlocked, wantNext: ticket.StatusInProgress, wantOK: true},
+		{name: "done is terminal", from: ticket.StatusDone, wantNext: "", wantOK: false},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			gotNext, gotOK := fsm.NextStatus(tc.from)
+
+			if gotOK != tc.wantOK {
+				t.Errorf("NextStatus(%q): ok = %v, want %v", tc.from, gotOK, tc.wantOK)
+			}
+			if gotNext != tc.wantNext {
+				t.Errorf("NextStatus(%q): next = %q, want %q", tc.from, gotNext, tc.wantNext)
+			}
+		})
+	}
+}
