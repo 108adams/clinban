@@ -843,3 +843,129 @@ func TestNewInteractiveIDAssignment(t *testing.T) {
 		t.Errorf("expected ticket file %q not found", wantFile)
 	}
 }
+
+// Constants for body-args interactive tests.
+const (
+	bodyArgsTestTitle = "Fix session expiry bug"
+	bodyArgsTestType  = "bug"
+	bodyArgsTestBody  = "body text here"
+	bodyArgsTestSlug  = "fix-session-expiry-bug"
+	bodyArgsTestID    = "0001"
+)
+
+// runNewInteractiveWithArgs executes "clinban new [args...]" (interactive) in
+// workDir, with the given EDITOR environment variable and stdin input.
+func runNewInteractiveWithArgs(t *testing.T, bin, workDir, editorPath, stdin string, args ...string) (stdout, stderr string, exitCode int) {
+	t.Helper()
+	cmdArgs := append([]string{"new"}, args...)
+	cmd := exec.Command(bin, cmdArgs...)
+	cmd.Dir = workDir
+	cmd.Env = append(coverEnv(), "EDITOR="+editorPath)
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
+	} else {
+		cmd.Stdin = strings.NewReader("")
+	}
+	var outBuf, errBuf strings.Builder
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+	err := cmd.Run()
+	stdout = outBuf.String()
+	stderr = errBuf.String()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		} else {
+			exitCode = -1
+		}
+	}
+	return stdout, stderr, exitCode
+}
+
+// TestNewInteractiveWithBodyArgs verifies that positional args are pre-filled
+// into the temp file as body text, survive the editor round-trip, and appear
+// in the created ticket file.
+func TestNewInteractiveWithBodyArgs(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	root, ticketsDir, _ := setupWorkDir(t)
+	scriptDir := t.TempDir()
+
+	// Editor sets title and type; leaves body untouched.
+	editorScript := makeEditorScript(t, scriptDir, bodyArgsTestTitle, bodyArgsTestType)
+
+	stdout, stderr, code := runNewInteractiveWithArgs(t, bin, root, editorScript, "", bodyArgsTestBody)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+
+	wantFile := fmt.Sprintf("%s-%s.md", bodyArgsTestID, bodyArgsTestSlug)
+	if !strings.Contains(stdout, "created:") {
+		t.Errorf("stdout = %q, want 'created:' prefix", stdout)
+	}
+	if !strings.Contains(stdout, wantFile) {
+		t.Errorf("stdout = %q, want to contain %q", stdout, wantFile)
+	}
+
+	ticketPath := filepath.Join(ticketsDir, wantFile)
+	content, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("reading ticket file: %v", err)
+	}
+
+	if !strings.Contains(string(content), bodyArgsTestBody) {
+		t.Errorf("ticket body does not contain %q\nfull content:\n%s", bodyArgsTestBody, string(content))
+	}
+}
+
+// TestNewInteractiveNoArgsUnchanged verifies that the existing happy-path
+// behaviour is preserved when no positional args are passed.
+func TestNewInteractiveNoArgsUnchanged(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	root, ticketsDir, _ := setupWorkDir(t)
+	scriptDir := t.TempDir()
+
+	editorScript := makeEditorScript(t, scriptDir, interactiveTestTitle, interactiveTestType)
+
+	stdout, stderr, code := runNewInteractive(t, bin, root, editorScript, "")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+
+	wantFile := fmt.Sprintf("%s-%s.md", interactiveTestID, interactiveTestSlug)
+	if !strings.Contains(stdout, "created:") {
+		t.Errorf("stdout = %q, want 'created:' prefix", stdout)
+	}
+	if !strings.Contains(stdout, wantFile) {
+		t.Errorf("stdout = %q, want to contain %q", stdout, wantFile)
+	}
+
+	ticketPath := filepath.Join(ticketsDir, wantFile)
+	if _, err := os.Stat(ticketPath); os.IsNotExist(err) {
+		t.Fatalf("ticket file %q not found", wantFile)
+	}
+
+	content, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("reading ticket: %v", err)
+	}
+	body := string(content)
+
+	checks := []struct {
+		desc    string
+		wantStr string
+	}{
+		{"id field", fmt.Sprintf(`id: "%s"`, interactiveTestID)},
+		{"status field", `status:`},
+		{"type field", interactiveTestType},
+		{"title field", interactiveTestTitle},
+	}
+	for _, c := range checks {
+		if !strings.Contains(body, c.wantStr) {
+			t.Errorf("%s: file does not contain %q\ncontent:\n%s", c.desc, c.wantStr, body)
+		}
+	}
+}

@@ -37,6 +37,7 @@ By default opens an editor with a pre-populated template (interactive mode).
 Use --no-interactive together with --title and --type to create a ticket
 from flags without opening an editor.`,
 	SilenceUsage: true,
+	Args:         cobra.ArbitraryArgs,
 	RunE:         runNew,
 }
 
@@ -50,15 +51,15 @@ func init() {
 }
 
 // runNew dispatches to the interactive or non-interactive creation path.
-func runNew(_ *cobra.Command, _ []string) error {
+func runNew(_ *cobra.Command, args []string) error {
 	if newFlagValues.noInteractive {
 		return runNewNonInteractive(newFlagValues)
 	}
-	return runNewInteractive()
+	return runNewInteractive(strings.Join(args, " "))
 }
 
 // runNewInteractive is the interactive ticket-creation path (T-17).
-func runNewInteractive() error {
+func runNewInteractive(body string) error {
 	// Assign next ID.
 	nextID, err := st.NextID()
 	if err != nil {
@@ -86,6 +87,13 @@ func runNewInteractive() error {
 		_ = tmpFile.Close()
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("new: write template: %w", err)
+	}
+	if body != "" {
+		if _, err := tmpFile.Write([]byte("\n" + body + "\n")); err != nil {
+			_ = tmpFile.Close()
+			_ = os.Remove(tmpPath)
+			return fmt.Errorf("new: write body: %w", err)
+		}
 	}
 	if err := tmpFile.Close(); err != nil {
 		_ = os.Remove(tmpPath)
