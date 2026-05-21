@@ -46,6 +46,11 @@ var rules = []ruleFunc{
 // output. The allIDs argument is the repository context used for uniqueness
 // checks across active and archived tickets.
 //
+// Precondition: t.ID must be set before calling Lint; ruleRequiredFields will
+// report a violation if t.ID is empty. On the read path, store.ReadTicket
+// injects the ID from the filename automatically. On the write path (new,
+// register), callers must set t.ID explicitly before calling Lint.
+//
 // Returns an empty (never nil) slice when the ticket is valid.
 func Lint(t *ticket.Ticket, filename string, allIDs []string) []LintError {
 	result := []LintError{}

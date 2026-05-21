@@ -116,7 +116,9 @@ Run lint after any direct file edit to confirm frontmatter is still valid.
 
 ## Rules
 
-- `id`, `created`, `updated` are owned by Clinban. Never set or edit them.
+- `created` and `updated` are owned by Clinban. Never edit them directly.
+- The ticket ID is derived from the filename's four-digit prefix. Never rename a
+  ticket file or add an `id:` line to frontmatter.
 - `status` must only change via `clinban move` or `clinban push`.
 - `title`, `type`, `tags` are author-owned and may be edited freely.
 - Body below `---` is freeform — edit freely, but do not bleed content into frontmatter.

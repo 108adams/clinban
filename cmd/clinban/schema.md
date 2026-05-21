@@ -84,8 +84,13 @@ the ID is encoded only in the filename. Never add an `id:` line to frontmatter.
 **Field ownership rules:**
 
 - Fields owned by Clinban (`created`, `updated`) are set and maintained
-  by the tool. If you write a ticket file directly, omit those fields and let
-  Clinban fill them in — or use `clinban register` which will overwrite them.
+  by the tool. There are two paths for writing ticket files:
+  - **Via `clinban register <path>`:** you may omit `created` and `updated`;
+    the tool sets them for you.
+  - **Writing directly into the managed directory:** you must include valid
+    RFC 3339 timestamps for both `created` and `updated`. `clinban lint` checks
+    for zero values and will reject any file that is missing these fields or has
+    them set to the zero timestamp.
 - `status` is initialized by Clinban and must only be changed through
   `clinban move`. Direct edits to `status` bypass transition validation.
 - `type`, `title`, and `tags` are owned by the author and may be edited freely.
@@ -175,8 +180,10 @@ Follow these steps exactly. Do not skip or reorder steps.
 3. Edit the desired frontmatter fields (`type`, `title`, `tags`) or the body.
 4. Save and close the editor. Clinban validates the result and writes the ticket
    only if parse and lint pass; on failure it prompts to reopen.
-5. Do not modify `id`, `created`, or `updated` — Clinban owns these fields and
-   refreshes `updated` automatically on every write.
+5. Do not rename the ticket file or add an `id:` frontmatter line — the ticket
+   ID is derived from the filename's four-digit prefix and must not appear in
+   frontmatter. Do not edit `created` or `updated` — Clinban refreshes `updated`
+   automatically on every write.
 
 ### 6.3 Move status
 

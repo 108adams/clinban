@@ -63,7 +63,10 @@ The ticket ID is derived exclusively from the filename's four-digit prefix and i
 
 ## System-Owned Fields
 
-Clinban owns `created` and `updated`. On creation or registration, external values for those fields are ignored or overwritten.
+Clinban owns `created` and `updated`. There are two paths for providing these fields:
+
+- **Via `clinban register <path>`:** you may omit `created` and `updated`; the tool sets them for you, overwriting any values already present.
+- **Writing directly into the managed directory:** you must include valid RFC 3339 timestamps for both `created` and `updated`. `clinban lint` checks for zero values and rejects any file that is missing these fields or has them set to the zero timestamp.
 
 `status` is initialized by Clinban and normally changed through `clinban move`. Direct file writers can still change it, but `clinban lint` only validates that the value is legal; it does not reconstruct transition history.
 

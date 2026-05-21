@@ -3,7 +3,7 @@ title: Validation
 kind: reference
 scope: validation
 summary: Explains parse errors, lint rules, and workflow transition enforcement.
-updated: 2026-05-19
+updated: 2026-05-21
 links:
   - ticket-schema
   - cli
@@ -26,13 +26,13 @@ Lint cannot run on a ticket that failed to parse.
 
 Rules run in order:
 
-1. Required fields are present: `id`, `status`, `title`, `type`, `created`, `updated`.
-2. `status` is valid.
-3. `type` is valid.
-4. `id` matches the numeric filename prefix.
-5. `created` and `updated` are valid timestamps.
-6. `tags`, if present, is a list of non-empty strings.
-7. `id` is unique across active and archived tickets.
+1. **Required fields are present:** `id`, `status`, `title`, `type`, `created`, `updated` are all non-zero.
+   - `id` is not a frontmatter field. It is derived from the ticket file's four-digit filename prefix (e.g. `0042-fix-login.md` → `"0042"`) and injected by `store.ReadTicket` before lint runs. `ruleRequiredFields` checks that this injection happened — if `t.ID` is empty, lint reports a missing `id`.
+   - `created` and `updated` are checked for zero values here. A zero timestamp means the field was absent or could not be parsed as RFC 3339.
+2. **`status` is valid:** must be one of `backlog`, `in-progress`, `blocked`, `done`. Skipped if `status` is empty (rule 1 already flags that).
+3. **`type` is valid:** must be one of `bug`, `task`, `feature`, `spike`. Skipped if `type` is empty (rule 1 already flags that).
+4. **`tags` contains only non-empty strings:** each element in the `tags` list must be a non-empty, non-blank string.
+5. **`id` is unique:** `t.ID` must appear exactly once across all active and archived tickets.
 
 Lint errors are printed one per line:
 
