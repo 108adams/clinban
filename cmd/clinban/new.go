@@ -47,6 +47,9 @@ func init() {
 	newCmd.Flags().StringVar(&newFlagValues.body, "body", "", "Ticket body (markdown)")
 	newCmd.Flags().StringVar(&newFlagValues.tags, "tags", "", "Comma-separated list of tags")
 	newCmd.Flags().BoolVar(&newFlagValues.noInteractive, "no-interactive", false, "Create ticket from flags without opening an editor")
+	// Treat everything after the subcommand name as positional args so that
+	// body text containing "--flag-like" words is not parsed as unknown flags.
+	newCmd.Flags().SetInterspersed(false)
 	rootCmd.AddCommand(newCmd)
 }
 
@@ -120,8 +123,9 @@ func runNewInteractive(body string) error {
 	// Parse the ticket from the edited file.
 	t, err := ticket.Parse(content)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: could not parse edited ticket: %v\n", err)
 		_ = os.Remove(tmpPath)
-		return fmt.Errorf("new: parse ticket: %w", err)
+		return ExitError{Code: 1, Err: fmt.Errorf("new: parse ticket: %w", err)}
 	}
 
 	// Detect discard: title is still the empty placeholder.

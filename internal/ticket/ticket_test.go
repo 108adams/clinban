@@ -453,3 +453,55 @@ func TestParseMissingFrontmatterSentinel(t *testing.T) {
 		t.Errorf("error is %v; want errors.Is(..., ErrMissingFrontmatter) to be true", err)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Regression: close fence at EOF without trailing newline (Bug 2)
+// ---------------------------------------------------------------------------
+
+// TestParseCloseFenceAtEOF verifies that Parse succeeds when the closing ---
+// is not followed by a newline (some editors strip trailing newlines on save).
+func TestParseCloseFenceAtEOF(t *testing.T) {
+	t.Parallel()
+
+	// Identical to fixtureContent but the trailing newline after "---" is removed.
+	const noTrailingNL = "---\n" +
+		"id: \"0042\"\n" +
+		"status: in-progress\n" +
+		"type: bug\n" +
+		"title: Fix login timeout on staging\n" +
+		"tags: []\n" +
+		"created: 2026-05-18T14:30:00Z\n" +
+		"updated: 2026-05-18T15:00:00Z\n" +
+		"---" // no trailing \n
+
+	tk, err := ticket.Parse([]byte(noTrailingNL))
+	if err != nil {
+		t.Fatalf("Parse() unexpected error for EOF fence: %v", err)
+	}
+	if tk.ID != "0042" {
+		t.Errorf("ID = %q, want %q", tk.ID, "0042")
+	}
+	if tk.Body != "" {
+		t.Errorf("Body = %q, want empty string", tk.Body)
+	}
+}
+
+// TestParseCRLF verifies that Parse succeeds when line endings are CRLF
+// (as produced by Windows editors or editors configured with CRLF mode).
+func TestParseCRLF(t *testing.T) {
+	t.Parallel()
+
+	// Take fixtureContent and replace every \n with \r\n.
+	crlf := strings.ReplaceAll(fixtureContent, "\n", "\r\n")
+
+	tk, err := ticket.Parse([]byte(crlf))
+	if err != nil {
+		t.Fatalf("Parse() unexpected error for CRLF content: %v", err)
+	}
+	if tk.ID != "0042" {
+		t.Errorf("ID = %q, want %q", tk.ID, "0042")
+	}
+	if tk.Title != "Fix login timeout on staging" {
+		t.Errorf("Title = %q, want %q", tk.Title, "Fix login timeout on staging")
+	}
+}

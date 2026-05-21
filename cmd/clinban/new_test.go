@@ -919,6 +919,46 @@ func TestNewInteractiveWithBodyArgs(t *testing.T) {
 	}
 }
 
+// TestNewInteractiveBodyArgWithDashDash verifies that body text containing
+// "--flag-like" words (e.g. "add a '--archived' flag") is treated as a
+// positional argument, not parsed as an unknown flag. Without
+// SetInterspersed(false) on the newCmd flags, Cobra would error on "--archived"
+// and SilenceErrors would swallow it, producing a silent no-op.
+func TestNewInteractiveBodyArgWithDashDash(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	root, ticketsDir, _ := setupWorkDir(t)
+	scriptDir := t.TempDir()
+
+	editorScript := makeEditorScript(t, scriptDir, bodyArgsTestTitle, bodyArgsTestType)
+
+	// Pass body text that contains a --flag-like word; should not silently fail.
+	stdout, stderr, code := runNewInteractiveWithArgs(t, bin, root, editorScript, "",
+		"add", "a", "--archived", "flag", "to", "list")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "created:") {
+		t.Errorf("stdout = %q, want 'created:' — body with --flag-like word should not silently fail", stdout)
+	}
+
+	// The created ticket should exist.
+	entries, err := os.ReadDir(ticketsDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mdFiles []string
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			mdFiles = append(mdFiles, e.Name())
+		}
+	}
+	if len(mdFiles) == 0 {
+		t.Error("no ticket file created when body contains --flag-like word")
+	}
+}
+
 // TestNewInteractiveNoArgsUnchanged verifies that the existing happy-path
 // behaviour is preserved when no positional args are passed.
 func TestNewInteractiveNoArgsUnchanged(t *testing.T) {

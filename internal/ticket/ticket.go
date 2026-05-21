@@ -66,7 +66,9 @@ const fence = "---"
 // absent. It returns a wrapped YAML error when the frontmatter block is
 // syntactically malformed.
 func Parse(content []byte) (*Ticket, error) {
-	s := string(content)
+	// Normalise CRLF to LF so editors on Windows or with CRLF mode don't
+	// produce a silent parse failure.
+	s := strings.ReplaceAll(string(content), "\r\n", "\n")
 
 	// The document must start with the opening fence line.
 	const openFence = fence + "\n"
@@ -75,15 +77,23 @@ func Parse(content []byte) (*Ticket, error) {
 	}
 
 	// Strip the opening fence and find the closing fence.
+	// Accept both "\n---\n" (normal) and "\n---" at end of file (editors that
+	// strip the trailing newline on save).
 	rest := s[len(openFence):]
-	const closeFence = "\n" + fence + "\n"
-	idx := strings.Index(rest, closeFence)
-	if idx == -1 {
+	const closeFenceNL = "\n" + fence + "\n"
+	const closeFenceEOF = "\n" + fence
+	idx := strings.Index(rest, closeFenceNL)
+	var body string
+	if idx != -1 {
+		body = rest[idx+len(closeFenceNL):]
+	} else if strings.HasSuffix(rest, closeFenceEOF) {
+		idx = len(rest) - len(closeFenceEOF)
+		body = ""
+	} else {
 		return nil, ErrMissingFrontmatter
 	}
 
 	yamlBlock := rest[:idx]
-	body := rest[idx+len(closeFence):]
 
 	var fm frontmatter
 	if err := yaml.Unmarshal([]byte(yamlBlock), &fm); err != nil {
