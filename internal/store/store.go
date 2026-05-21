@@ -2,6 +2,9 @@ package store
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/108adams/clinban/internal/config"
 	"github.com/108adams/clinban/internal/ticket"
@@ -29,6 +32,17 @@ func New(cfg *config.Config) *Store {
 		TicketsDir: cfg.TicketsDir,
 		ArchiveDir: cfg.ArchiveDir,
 	}
+}
+
+// Remove deletes the ticket file at path from disk.
+//
+// The path must be an absolute path to an existing file. If the file cannot be
+// removed, the error is wrapped with context identifying the filename.
+func (s *Store) Remove(path string) error {
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("store: remove %s: %w", filepath.Base(path), err)
+	}
+	return nil
 }
 
 // Record pairs a parsed ticket with its filesystem location.

@@ -136,6 +136,16 @@ With an ID, archives one ticket. The ticket must be `done`.
 
 Without an ID, lists all active `done` tickets and prompts for confirmation before archiving them.
 
+## `clinban remove <id>`
+
+Permanently deletes the ticket file from disk (active or archive directory).
+
+Exit codes:
+
+- `0` — file removed; prints `removed: <filename>` to stdout
+- `1` — ticket not found; prints `ticket not found` to stderr
+- `1` — multiple files share the ID (collision); lists all colliding filenames on stderr and suggests running `clinban lint`
+
 ## `clinban lint [id]`
 
 Validates one ticket or all tickets. With no argument, active and archived tickets are checked.

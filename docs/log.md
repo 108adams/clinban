@@ -85,6 +85,12 @@ links:
 - Updated: `docs/cli.md`, `docs/log.md`
 - Notes: Documented editor command arguments and automatic wait flags for common GUI editors so interactive `new` and `edit` do not read unchanged temp files before save.
 
+## [2026-05-21] feature | clinban remove command
+
+- Source: `cmd/clinban/remove.go`, `cmd/clinban/remove_test.go`, `internal/store/scan.go`, `internal/store/store.go`, `internal/store/store_test.go`
+- Updated: `docs/cli.md`, `docs/log.md`
+- Notes: Added `clinban remove <id>` which deletes a ticket file from disk. Exits 1 with "ticket not found" when the ID doesn't exist. Exits 1 with a list of colliding filenames and a lint suggestion when multiple files share the same ID. Added `FindAllByID` to the store for collision detection and `Remove` as a thin `os.Remove` wrapper.
+
 ## [2026-05-21] fix | Interactive new validates before writing
 
 - Source: `cmd/clinban/new.go`, `cmd/clinban/new_test.go`

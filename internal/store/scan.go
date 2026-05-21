@@ -133,6 +133,43 @@ func (s *Store) FindByID(id string) (path string, inArchive bool, err error) {
 	return "", false, ErrNotFound
 }
 
+// FindAllByID returns all managed ticket file paths whose four-digit ID prefix
+// matches id. Both TicketsDir and ArchiveDir are searched.
+//
+// The id argument is normalised to a four-digit zero-padded string before
+// matching. Unlike FindByID, all matching paths are returned — not just the
+// first. The returned slice is never nil; it is empty when no files match.
+// ErrNotFound is never returned; the caller is responsible for handling an
+// empty slice.
+func (s *Store) FindAllByID(id string) ([]string, error) {
+	if n, parseErr := strconv.Atoi(id); parseErr == nil {
+		id = fmt.Sprintf("%04d", n)
+	}
+	paths := []string{}
+	for _, dir := range []string{s.TicketsDir, s.ArchiveDir} {
+		entries, readErr := os.ReadDir(dir)
+		if readErr != nil {
+			if os.IsNotExist(readErr) {
+				continue
+			}
+			return nil, fmt.Errorf("store: find all %s: %w", id, readErr)
+		}
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			m := idPattern.FindStringSubmatch(e.Name())
+			if m == nil {
+				continue
+			}
+			if m[1] == id {
+				paths = append(paths, filepath.Join(dir, e.Name()))
+			}
+		}
+	}
+	return paths, nil
+}
+
 // AllIDs returns every managed ticket ID found in active and archived
 // filenames.
 //

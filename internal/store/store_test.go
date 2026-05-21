@@ -277,6 +277,117 @@ func TestFindByIDPrefersTicketsDir(t *testing.T) {
 	}
 }
 
+// ---- TestFindAllByID ----
+
+func TestFindAllByID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no match returns empty slice", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(t)
+
+		paths, err := s.FindAllByID("0042")
+		if err != nil {
+			t.Fatalf("FindAllByID error: %v", err)
+		}
+		if paths == nil {
+			t.Fatal("FindAllByID returned nil, want non-nil empty slice")
+		}
+		if len(paths) != 0 {
+			t.Errorf("FindAllByID = %v, want empty slice", paths)
+		}
+	})
+
+	t.Run("single active match returns slice of 1", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(t)
+
+		tk := makeTicket("0005", testTitle)
+		want := writeTicketFile(t, s.TicketsDir, "0005-fix-login-timeout-on.md", tk)
+
+		paths, err := s.FindAllByID("0005")
+		if err != nil {
+			t.Fatalf("FindAllByID error: %v", err)
+		}
+		if len(paths) != 1 {
+			t.Fatalf("FindAllByID returned %d paths, want 1: %v", len(paths), paths)
+		}
+		if paths[0] != want {
+			t.Errorf("path = %q, want %q", paths[0], want)
+		}
+	})
+
+	t.Run("single archive match returns slice of 1", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(t)
+
+		if err := os.MkdirAll(s.ArchiveDir, 0o755); err != nil {
+			t.Fatalf("setup: mkdir archive: %v", err)
+		}
+		tk := makeTicket("0003", testTitle3)
+		want := writeTicketFile(t, s.ArchiveDir, "0003-investigate-memory-leak.md", tk)
+
+		paths, err := s.FindAllByID("0003")
+		if err != nil {
+			t.Fatalf("FindAllByID error: %v", err)
+		}
+		if len(paths) != 1 {
+			t.Fatalf("FindAllByID returned %d paths, want 1: %v", len(paths), paths)
+		}
+		if paths[0] != want {
+			t.Errorf("path = %q, want %q", paths[0], want)
+		}
+	})
+
+	t.Run("collision two files same ID prefix returns slice of 2", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(t)
+
+		tk := makeTicket("0001", testTitle)
+		p1 := writeTicketFile(t, s.TicketsDir, "0001-fix-login-timeout-on.md", tk)
+		p2 := writeTicketFile(t, s.TicketsDir, "0001-old-title.md", tk)
+
+		paths, err := s.FindAllByID("0001")
+		if err != nil {
+			t.Fatalf("FindAllByID error: %v", err)
+		}
+		if len(paths) != 2 {
+			t.Fatalf("FindAllByID returned %d paths, want 2: %v", len(paths), paths)
+		}
+		found := map[string]bool{p1: false, p2: false}
+		for _, p := range paths {
+			if _, ok := found[p]; !ok {
+				t.Errorf("unexpected path %q in result", p)
+			}
+			found[p] = true
+		}
+		for p, seen := range found {
+			if !seen {
+				t.Errorf("expected path %q not found in result %v", p, paths)
+			}
+		}
+	})
+
+	t.Run("short id normalised to 4 digits", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(t)
+
+		tk := makeTicket("0005", testTitle)
+		want := writeTicketFile(t, s.TicketsDir, "0005-fix-login-timeout-on.md", tk)
+
+		paths, err := s.FindAllByID("5")
+		if err != nil {
+			t.Fatalf("FindAllByID error: %v", err)
+		}
+		if len(paths) != 1 {
+			t.Fatalf("FindAllByID returned %d paths, want 1: %v", len(paths), paths)
+		}
+		if paths[0] != want {
+			t.Errorf("path = %q, want %q", paths[0], want)
+		}
+	})
+}
+
 // ---- TestAllIDs ----
 
 func TestAllIDs(t *testing.T) {
