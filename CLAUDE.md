@@ -9,7 +9,6 @@ Use skills before acting:
 - `/dev` — orient on a task and start implementing (loads task context, follows TDD)
 - `/techlead` — design sessions and task decomposition
 - `/architect` — architectural decisions
-- `/kb-query` — query project knowledge before answering questions
 - `/simplify` — post-implementation review pass
 - `/librarian` — docs wiki work (create, ingest, update, lint `docs/` pages)
 
