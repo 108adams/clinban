@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/108adams/clinban/internal/ticket"
 )
 
 // Constants for new command tests.
@@ -1100,8 +1102,12 @@ func TestNewInteractiveSplitEnabledWithHash(t *testing.T) {
 	}
 	body := string(content)
 
-	if !strings.Contains(body, `title: "title"`) {
-		t.Errorf("frontmatter does not contain title: \"title\"\nfull content:\n%s", body)
+	parsed, err := ticket.Parse(content)
+	if err != nil {
+		t.Fatalf("ticket.Parse failed: %v\nfull content:\n%s", err, body)
+	}
+	if parsed.Title != "title" {
+		t.Errorf("parsed title = %q, want %q\nfull content:\n%s", parsed.Title, "title", body)
 	}
 	if !strings.Contains(body, "body text") {
 		t.Errorf("file body does not contain \"body text\"\nfull content:\n%s", body)

@@ -79,6 +79,55 @@ _Input: pipeline/03_design.md_
 
 ---
 
+### TASK-FIX-1: YAML-safe title rendering in template + fix stale doc comment
+
+- **Description:** Register a `yamlstr` template function in `internal/template/template.go` using `gopkg.in/yaml.v3`. Change `internal/template/new.md` from `title: "{{.Title}}"` to `title: {{yamlstr .Title}}`. Update the `New` doc comment to remove the stale "intentionally blank" language for the title field. Replace string-containment title assertions in `template_test.go` with roundtrip tests (`New → ticket.Parse → t.Title == input`), expanding coverage to include double-quote, single-quote, colon-space, backslash, and newline inputs.
+- **Module(s):** `internal/template/template.go`, `internal/template/new.md`, `internal/template/template_test.go`
+- **Done criteria:**
+  - [ ] `template.go`: `New` registers `yamlstr` via `template.FuncMap`; `yamlstr` calls `yaml.Marshal(s)` and strips trailing `\n`; `gopkg.in/yaml.v3` imported
+  - [ ] `new.md`: `title: "{{.Title}}"` changed to `title: {{yamlstr .Title}}`
+  - [ ] `template.go` doc comment on `New` updated: no longer says title is intentionally blank; accurately describes pre-fill behaviour
+  - [ ] `template_test.go`: table-driven roundtrip test covers `""`, simple string, string with `"`, string with `'`, string with `: ` (colon-space), string with `\`, string with `\n` — each case calls `ticket.Parse` and asserts `t.Title == input`
+  - [ ] `ticket.Parse(template.New(now, "", title))` succeeds and `t.Title == title` for all table entries
+  - [ ] `go test ./internal/template/... ./internal/ticket/...` passes
+  - [ ] `go vet ./...` and `gofmt -l .` clean
+- **Depends on:** none
+- **Notes:** `gopkg.in/yaml.v3` is already a direct dependency (used by `internal/ticket`). Import it in the template package directly. The `yamlstr` func is unexported and only registered inside `New` — it does not need to be a package-level symbol.
+
+---
+
+### TASK-FIX-2: Update stale user-facing docs for # split feature
+
+- **Description:** Update all stale documentation for the `#` title/body split feature introduced in the initial implementation. Use `/librarian` for the `docs/` pages. The `cmd/clinban/new.go` Long string change is a code edit.
+- **Module(s):** `cmd/clinban/new.go` (Long string only), `docs/cli.md`, `docs/configuration.md`, `docs/log.md`
+- **Done criteria:**
+  - [ ] `cmd/clinban/new.go` Long: describes `#` as title/body separator; shows a `\#`-escaped example; mentions `split_raw_new=false` disables splitting; retains existing shell-escaping note
+  - [ ] `docs/cli.md` §`clinban new`: replaces "positional arguments are joined and pre-filled as the body" with description of `#` splitting; shows two examples — no separator (all goes to body) and with `\#` (title + body pre-filled)
+  - [ ] `docs/cli.md` §`clinban config` Valid keys section: `split_raw_new` added with accepted values `true` / `false` and description
+  - [ ] `docs/cli.md` config output example block updated to include `split_raw_new`
+  - [ ] `docs/configuration.md` Fields table: row for `split_raw_new` — default `true`, description explains opt-out via `false`
+  - [ ] `docs/log.md`: new entry recording this docs update
+  - [ ] `go build ./...` and `go test ./...` pass (Long string change must not break compilation)
+- **Depends on:** none
+- **Notes:** Read the existing docs carefully before editing — match heading style, code-block conventions, and table format exactly. The `docs/` pages use YAML frontmatter with an `updated:` date field that must be set to `2026-05-22`.
+
+---
+
+### TASK-FIX-3: Add docs gate to /dev skill
+
+- **Description:** Edit `.claude/skills/dev` to add a mandatory "Docs gate" as item 9 in the Go Quality Gates section, immediately after the existing `gofmt` gate (item 8 / "Formatting"). This ensures future dev-agent dispatches include the CLAUDE.md docs obligation in every task execution context.
+- **Module(s):** `.claude/skills/dev`
+- **Done criteria:**
+  - [ ] `.claude/skills/dev` contains a "### 9. Docs gate" section after the Formatting section
+  - [ ] Gate text states: if the task changes user-visible CLI behaviour, adds a config key, or changes command output — update `docs/cli.md`, `docs/configuration.md`, append to `docs/log.md`
+  - [ ] Gate text states this is a DoD requirement from CLAUDE.md and is non-negotiable
+  - [ ] Gate text instructs the agent to explicitly note "docs gate does not apply" with a reason when no docs change is needed
+  - [ ] No other content in the skill file is modified
+- **Depends on:** none
+- **Notes:** This is a plain text edit. No Go quality gates apply. Read the skill file first to understand the exact section structure before editing.
+
+---
+
 ## Dependency Order
 
 ```
@@ -98,3 +147,15 @@ Plain ordered list for a single developer working sequentially:
 3. TASK-003 (no deps, ~45 min — can be done in parallel with TASK-002)
 4. TASK-004 (no deps, ~30 min — can be done in parallel with TASK-002/003)
 5. TASK-005 (requires TASK-002, TASK-003, TASK-004 complete, ~2 h)
+
+---
+
+## Fix Pass — Dependency Order (addendum 2026-05-22)
+
+```
+Fix pass (independent of each other, can run in parallel):
+
+TASK-FIX-1 ── (no deps)
+TASK-FIX-2 ── (no deps)
+TASK-FIX-3 ── (no deps)
+```

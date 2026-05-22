@@ -145,3 +145,69 @@ Two items:
 | How to detect TOML bool absence (default-`true` problem)? | Use separate presence-tracking bool mirroring the existing `ticketsDirSet` pattern in `Entries`; in `Load` use an anonymous struct with a `*bool` field so nil means unset, default `true` | Consistent with the codebase's existing approach; avoids adding a third-party dependency. |
 | Should `splitRawBody` be exported? | No (`splitRawBody`, lowercase) | It is an implementation detail of the `new` command; testing via package-internal test file (`new_test.go` in `package main`) is sufficient. |
 | Does `template.New` signature change break `runNewNonInteractive`? | Yes — caller must be updated to pass `""` as the new third argument | `runNewNonInteractive` does not use `template.New` (it builds a `ticket.Ticket` struct directly), so no change is needed there. Only `runNewInteractive` calls `template.New`. |
+
+---
+
+## Fix Pass — Code Review Findings (2026-05-22)
+
+Three issues found in code review after the initial implementation commit.
+
+### Fix 1 — YAML-safe title rendering
+
+**File:** `internal/template/template.go`, `internal/template/new.md`, `internal/template/template_test.go`
+
+The current template renders `title: "{{.Title}}"` via Go `text/template` string interpolation with no escaping. A title containing `"` produces invalid YAML. The fix: register a `yamlstr` template function using `gopkg.in/yaml.v3` `yaml.Marshal`, strip trailing `\n`, and change `new.md` to `title: {{yamlstr .Title}}`.
+
+**`yamlstr` contract:**
+- Input: any Go string
+- Output: YAML scalar representation (bare, single-quoted, or double-quoted as chosen by yaml.v3)
+- Empty string → `""`
+- Simple string → bare scalar e.g. `My Title`
+- String with `"` → single-quoted e.g. `'Fix "quoted" case'`
+- String with `:` followed by space → single-quoted
+- String with newline → double-quoted with escape
+
+**Invariant:** `ticket.Parse(template.New(now, "", title))` succeeds and returns `t.Title == title` for any valid Go string.
+
+**Test strategy:** Replace all string-containment title assertions in `template_test.go` with roundtrip assertions: `New → ticket.Parse → t.Title == input`. Table must include: `""`, simple, double-quote, single-quote, colon-space, backslash, newline.
+
+**Also in this task:** Fix the stale doc comment on `New` (line 21) — remove "intentionally blank" language for title; say title is pre-filled when a non-empty string is passed.
+
+---
+
+### Fix 2 — Stale user-facing docs
+
+**Files:** `cmd/clinban/new.go` (Long string), `docs/cli.md`, `docs/configuration.md`, `docs/log.md`
+
+The `clinban new` help text and wiki docs still describe the old "positional args go to body" behaviour. The `split_raw_new` config key is absent from all docs. These are release blockers per the project DoD.
+
+Changes needed:
+- `cmd/clinban/new.go` Long: describe `#` splitting, show `\#` example, mention `split_raw_new=false` to disable
+- `docs/cli.md` §`clinban new`: replace "positional arguments are joined and pre-filled as the body" with accurate split description; show two examples
+- `docs/cli.md` §`clinban config` Valid keys: add `split_raw_new` with description and valid values (`true`/`false`)
+- `docs/configuration.md` Fields table: add `split_raw_new` row (default `true`)
+- `docs/log.md`: new entry for this feature
+
+---
+
+### Fix 3 — Docs gate in /dev skill
+
+**File:** `.claude/skills/dev`
+
+The /dev agent skipped docs because: (1) task done criteria didn't list docs, and (2) the dev-agent launch prompt's quality gates section doesn't surface the CLAUDE.md docs obligation. Fix: add a mandatory "Docs gate" section to the Go Quality Gates in the dev skill, immediately after the existing `gofmt` gate.
+
+Docs gate text to add:
+```
+### 9. Docs gate (mandatory for any user-visible behaviour change)
+
+If the task changes user-visible CLI behaviour, adds a config key, or changes
+command output:
+
+- Update `docs/cli.md` for any command changes
+- Update `docs/configuration.md` for any new or changed config keys
+- Append an entry to `docs/log.md`
+
+This is a DoD requirement from CLAUDE.md and is non-negotiable. Use `/librarian`
+for non-trivial docs work. If none of the above apply, note explicitly that the
+docs gate does not apply and why.
+```

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Project guide is in **AGENTS.md** — read that first. This file adds Claude Code-specific workflow on top of it.
+Project guide is in **AGENTS.md** — MUST read that first. This file adds Claude Code-specific workflow on top of it.
 
 ## Skills
 

@@ -88,51 +88,26 @@ func TestNewTemplateStatesComment(t *testing.T) {
 	}
 }
 
-// TestNewEmptyTitleRendersEmptyTitleField verifies that passing an empty title
-// produces title: "" in the output (backwards-compatible behaviour).
-func TestNewEmptyTitleRendersEmptyTitleField(t *testing.T) {
-	t.Parallel()
-
-	b, err := template.New(fixedTime, "", "")
-	if err != nil {
-		t.Fatalf("New returned error: %v", err)
-	}
-
-	const want = `title: ""`
-	if !strings.Contains(string(b), want) {
-		t.Errorf("output does not contain %q:\n%s", want, string(b))
-	}
-}
-
-// TestNewWithTitlePopulatesField verifies that a non-empty title is rendered
-// into the frontmatter title field.
-func TestNewWithTitlePopulatesField(t *testing.T) {
-	t.Parallel()
-
-	const testTitle = "My Title"
-	b, err := template.New(fixedTime, "", testTitle)
-	if err != nil {
-		t.Fatalf("New returned error: %v", err)
-	}
-
-	want := `title: "My Title"`
-	if !strings.Contains(string(b), want) {
-		t.Errorf("output does not contain %q:\n%s", want, string(b))
-	}
-}
-
-// TestNewTitleTableDriven covers empty, non-empty, and special-character titles.
-func TestNewTitleTableDriven(t *testing.T) {
+// TestNewTitleRoundtrip verifies that for every title string, New renders it
+// as valid YAML and ticket.Parse recovers the exact original string.
+//
+// This replaces the old string-containment title assertions. The roundtrip
+// approach is more robust: it catches any yaml encoding/decoding mismatch
+// regardless of whether the rendered form uses quotes, escapes, etc.
+func TestNewTitleRoundtrip(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name  string
 		title string
-		want  string
 	}{
-		{name: "empty title", title: "", want: `title: ""`},
-		{name: "simple title", title: "Fix login timeout", want: `title: "Fix login timeout"`},
-		{name: "title with numbers", title: "Bug 42", want: `title: "Bug 42"`},
+		{name: "empty string", title: ""},
+		{name: "simple string", title: "Fix login timeout on staging"},
+		{name: "string with double quote", title: `Fix "quoted" case`},
+		{name: "string with single quote", title: "it's broken"},
+		{name: "string with colon-space", title: "feat: add new flag"},
+		{name: "string with backslash", title: `path\to\file`},
+		{name: "string with newline", title: "line one\nline two"},
 	}
 
 	for _, tc := range tests {
@@ -141,10 +116,17 @@ func TestNewTitleTableDriven(t *testing.T) {
 
 			b, err := template.New(fixedTime, "", tc.title)
 			if err != nil {
-				t.Fatalf("New returned error: %v", err)
+				t.Fatalf("New(%q) returned error: %v", tc.title, err)
 			}
-			if !strings.Contains(string(b), tc.want) {
-				t.Errorf("output does not contain %q:\n%s", tc.want, string(b))
+
+			parsed, err := ticket.Parse(b)
+			if err != nil {
+				t.Fatalf("ticket.Parse failed for title %q: %v\nrendered:\n%s", tc.title, err, string(b))
+			}
+
+			if parsed.Title != tc.title {
+				t.Errorf("roundtrip mismatch for %q:\n  got  %q\n  want %q\nrendered:\n%s",
+					tc.name, parsed.Title, tc.title, string(b))
 			}
 		})
 	}

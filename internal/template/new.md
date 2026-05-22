@@ -1,5 +1,5 @@
 ---
-title: "{{.Title}}"
+title: {{yamlstr .Title}}
 status: "backlog"
 # states: backlog, in-progress, blocked, done
 type: "{{.Type}}"

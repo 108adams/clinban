@@ -3,7 +3,7 @@ title: Configuration
 kind: reference
 scope: configuration
 summary: Describes .clinban configuration, project root discovery, and ticket directory defaults.
-updated: 2026-05-21
+updated: 2026-05-22
 links:
   - cli
   - storage
@@ -31,6 +31,7 @@ All fields are optional.
 | `tickets_dir` | `tickets` | Directory for active tickets. |
 | `archive_dir` | `<tickets_dir>/archive` | Directory for archived tickets. |
 | `default_type` | _(none)_ | Pre-fills the `type` field when creating a ticket. Must be one of `bug`, `task`, `feature`, `spike`; ignored if invalid. |
+| `split_raw_new` | `true` | When `true`, positional args to `clinban new` are split on the first `#` to pre-fill the title and body separately. Set to `false` to disable splitting and send all args to the body only. |
 
 ## Defaults
 

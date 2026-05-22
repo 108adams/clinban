@@ -3,7 +3,7 @@ title: Documentation Log
 kind: log
 scope: docs
 summary: Records chronological maintenance activity for the Clinban documentation wiki.
-updated: 2026-05-21
+updated: 2026-05-22
 links:
   - index
   - schema
@@ -12,6 +12,12 @@ links:
 ---
 
 # Documentation Log
+
+## [2026-05-22] docs | Document # title/body split feature for clinban new
+
+- Source: `cmd/clinban/new.go`, `internal/config/config.go`
+- Updated: `cmd/clinban/new.go` (Long string), `docs/cli.md`, `docs/configuration.md`, `docs/log.md`
+- Notes: Documented the `#` title/body splitting behaviour introduced in TASK-003–005. `clinban new` now pre-fills the frontmatter title from the text before `#` and the body from the text after `#` when positional args are given. Updated `clinban new` Long help text to describe splitting, show a `\#`-escaped example, and note the `split_raw_new=false` opt-out. Added `split_raw_new` to the valid-keys table and config output example in `docs/cli.md`, and added a row for `split_raw_new` to the Fields table in `docs/configuration.md`.
 
 ## [2026-05-21] refactor | Remove id: from frontmatter; ID derived from filename
 

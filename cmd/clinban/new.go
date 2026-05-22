@@ -37,11 +37,20 @@ By default opens an editor with a pre-populated template (interactive mode).
 Use --no-interactive together with --title and --type to create a ticket
 from flags without opening an editor.
 
-Positional arguments are joined with spaces and appended to the template as
-body text before the editor opens. Note: an unquoted '#' preceded by
-whitespace is treated as a shell comment and stripped before Go receives the
-arguments. To include '#' literally, either escape it ('\#') or quote the
-entire string (e.g. clinban new "title # body").`,
+Positional arguments are joined with spaces. If the joined string contains
+'#', the part before '#' (trimmed) pre-fills the frontmatter title, and the
+part after '#' (trimmed) pre-fills the body. If no '#' is present, the full
+string goes to the body only (no title pre-fill).
+
+Set split_raw_new=false in .clinban to disable splitting; all args then go
+to the body regardless of '#'.
+
+Note: an unquoted '#' preceded by whitespace is treated as a shell comment
+and stripped before Go receives the arguments. To include '#' literally,
+either escape it ('\#') or quote the entire string:
+
+    clinban new investigate the memory leak in the worker pool
+    clinban new fix login timeout on staging \# users see error after 30s`,
 	SilenceUsage: true,
 	Args:         cobra.ArbitraryArgs,
 	RunE:         runNew,

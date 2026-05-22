@@ -3,7 +3,7 @@ title: CLI Reference
 kind: reference
 scope: cli
 summary: Documents Clinban commands, expected outputs, and exit-code conventions.
-updated: 2026-05-21
+updated: 2026-05-22
 links:
   - ticket-schema
   - configuration
@@ -42,13 +42,19 @@ Creates a ticket interactively. Clinban renders a template with system fields, o
 
 `$EDITOR` may include arguments. For common GUI editors that return before the file is saved unless instructed to wait, Clinban adds the editor's wait flag automatically.
 
-Optional positional arguments are joined and pre-filled as the body:
+Optional positional arguments are joined with spaces. If the joined string contains `#`, the part before `#` (trimmed) pre-fills the frontmatter title and the part after `#` (trimmed) pre-fills the body. If there is no `#`, the full string goes to the body only (no title pre-fill).
 
 ```text
-clinban new "Investigate the memory leak in the worker pool"
+# Pre-fill body only (no # separator)
+clinban new investigate the memory leak in the worker pool
+
+# Pre-fill title and body
+clinban new fix login timeout on staging \# users see error after 30 seconds
 ```
 
-The editor opens with the body already present; the user only needs to fill in the title and type.
+The editor opens with the relevant fields already present.
+
+Set `split_raw_new=false` in `.clinban` to disable splitting; all args then go to the body regardless of `#`.
 
 If lint errors remain after editing, including an empty title, Clinban prompts
 to reopen the editor before creating the managed ticket. Declining the prompt
@@ -162,6 +168,7 @@ Views or sets configuration values stored in `.clinban`.
 tickets_dir = tickets         (not set in .clinban, default: tickets)
 archive_dir = tickets/archive (not set in .clinban, default: tickets/archive)
 default_type =                (not set in .clinban, no default)
+split_raw_new = true          (not set in .clinban, default: true)
 ```
 
 When a key is set in `.clinban`:
@@ -179,6 +186,7 @@ Valid keys:
 | `tickets_dir` | Any non-empty path | `tickets` |
 | `archive_dir` | Any non-empty path | `<tickets_dir>/archive` |
 | `default_type` | `bug`, `task`, `feature`, `spike`, or empty string to unset | _(none)_ |
+| `split_raw_new` | `true`, `false` | `true` |
 
 Exit codes:
 
