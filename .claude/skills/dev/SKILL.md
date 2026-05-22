@@ -137,6 +137,21 @@ Verify with:
 go list -f '{{.ImportPath}}: {{.Imports}}' ./internal/...
 ```
 
+### 9. Docs gate
+
+For any task that changes user-visible CLI behaviour, adds a config key, or
+changes command output:
+
+- Update `docs/cli.md` for command behaviour changes
+- Update `docs/configuration.md` for new or changed config keys
+- Append an entry to `docs/log.md`
+
+This is a DoD requirement from CLAUDE.md and is non-negotiable. Use `/librarian`
+for non-trivial docs work.
+
+If none of the above apply, state explicitly: "Docs gate: not applicable —
+[reason]."
+
 ---
 
 ## After the Agent Reports Back
