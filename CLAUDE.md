@@ -30,6 +30,12 @@ go vet ./...
 gofmt -w <changed-files>
 ```
 
+## Codebase Patterns
+
+- `//go:embed` paths must be within or below the package directory. Assets for `cmd/clinban` go in `cmd/clinban/` or a subdir — cannot embed from `.claude/` or repo root.
+- `cmd/clinban/init_test.go` uses binary integration tests (`buildBinary(t)` + `exec.Command`), not unit tests. New init tests must follow this pattern.
+- Use `os.MkdirAll` when creating nested dirs (e.g. `.claude/skills/tickets/`); `os.Mkdir` for single-level only.
+
 ## Commit Hygiene
 
 - One commit per logical unit of work (domain change → store → CLI → tests → docs).
