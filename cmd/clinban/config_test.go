@@ -64,8 +64,8 @@ func TestConfigNoArgs_NoConfig(t *testing.T) {
 		t.Errorf("exit code = %d, want 0; stderr=%q", code, stderr)
 	}
 
-	// All three keys must appear.
-	for _, key := range []string{"tickets_dir", "archive_dir", "default_type"} {
+	// All four keys must appear.
+	for _, key := range []string{"tickets_dir", "archive_dir", "default_type", "split_raw_new"} {
 		if !strings.Contains(stdout, key) {
 			t.Errorf("stdout missing key %q: %q", key, stdout)
 		}
@@ -129,7 +129,7 @@ func TestConfigNoArgs_WithOneSetKey(t *testing.T) {
 	}
 }
 
-// TestConfigNoArgs_AllKeysSet verifies that when all three keys are set no
+// TestConfigNoArgs_AllKeysSet verifies that when all four keys are set no
 // parenthetical notes appear.
 func TestConfigNoArgs_AllKeysSet(t *testing.T) {
 	t.Parallel()
@@ -138,7 +138,8 @@ func TestConfigNoArgs_AllKeysSet(t *testing.T) {
 	writeClibanConfig(t, root,
 		`tickets_dir = "`+configCustomTicketsDir+`"`+"\n"+
 			`archive_dir = "`+configCustomArchiveDir+`"`+"\n"+
-			`default_type = "`+configValidDefaultType+`"`+"\n")
+			`default_type = "`+configValidDefaultType+`"`+"\n"+
+			`split_raw_new = true`+"\n")
 
 	stdout, stderr, code := runConfig(t, bin, root)
 

@@ -23,9 +23,10 @@ With one argument of the form key=value, the key is set in .clinban. The file
 is created if it does not exist. Exits 1 on unknown key or invalid value.
 
 Known keys:
-  tickets_dir  — path to the active tickets directory (default: tickets)
-  archive_dir  — path to the archive directory (default: tickets/archive)
-  default_type — default ticket type: bug, task, feature, or spike (no default)`,
+  tickets_dir   — path to the active tickets directory (default: tickets)
+  archive_dir   — path to the archive directory (default: tickets/archive)
+  default_type  — default ticket type: bug, task, feature, or spike (no default)
+  split_raw_new — split positional args on first # into title and body (default: true)`,
 	Args: cobra.RangeArgs(0, 1),
 	RunE: runConfig,
 }

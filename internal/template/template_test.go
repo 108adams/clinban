@@ -14,7 +14,7 @@ var fixedTime = time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
 func TestNewReturnsParseableTicket(t *testing.T) {
 	t.Parallel()
 
-	b, err := template.New(time.Now(), "")
+	b, err := template.New(time.Now(), "", "")
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestNewReturnsParseableTicket(t *testing.T) {
 func TestNewContainsTimestamp(t *testing.T) {
 	t.Parallel()
 
-	b, err := template.New(fixedTime, "")
+	b, err := template.New(fixedTime, "", "")
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestNewContainsTimestamp(t *testing.T) {
 func TestNewOutputContainsNoIDField(t *testing.T) {
 	t.Parallel()
 
-	b, err := template.New(fixedTime, "task")
+	b, err := template.New(fixedTime, "task", "")
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestNewOutputContainsNoIDField(t *testing.T) {
 func TestNewWithDefaultType(t *testing.T) {
 	t.Parallel()
 
-	b, err := template.New(fixedTime, "bug")
+	b, err := template.New(fixedTime, "bug", "")
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestNewWithDefaultType(t *testing.T) {
 func TestNewTemplateStatesComment(t *testing.T) {
 	t.Parallel()
 
-	b, err := template.New(fixedTime, "task")
+	b, err := template.New(fixedTime, "task", "")
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -85,5 +85,67 @@ func TestNewTemplateStatesComment(t *testing.T) {
 	const wantComment = "# states: backlog, in-progress, blocked, done"
 	if !strings.Contains(string(b), wantComment) {
 		t.Errorf("template output does not contain %q:\n%s", wantComment, string(b))
+	}
+}
+
+// TestNewEmptyTitleRendersEmptyTitleField verifies that passing an empty title
+// produces title: "" in the output (backwards-compatible behaviour).
+func TestNewEmptyTitleRendersEmptyTitleField(t *testing.T) {
+	t.Parallel()
+
+	b, err := template.New(fixedTime, "", "")
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	const want = `title: ""`
+	if !strings.Contains(string(b), want) {
+		t.Errorf("output does not contain %q:\n%s", want, string(b))
+	}
+}
+
+// TestNewWithTitlePopulatesField verifies that a non-empty title is rendered
+// into the frontmatter title field.
+func TestNewWithTitlePopulatesField(t *testing.T) {
+	t.Parallel()
+
+	const testTitle = "My Title"
+	b, err := template.New(fixedTime, "", testTitle)
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	want := `title: "My Title"`
+	if !strings.Contains(string(b), want) {
+		t.Errorf("output does not contain %q:\n%s", want, string(b))
+	}
+}
+
+// TestNewTitleTableDriven covers empty, non-empty, and special-character titles.
+func TestNewTitleTableDriven(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		title string
+		want  string
+	}{
+		{name: "empty title", title: "", want: `title: ""`},
+		{name: "simple title", title: "Fix login timeout", want: `title: "Fix login timeout"`},
+		{name: "title with numbers", title: "Bug 42", want: `title: "Bug 42"`},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			b, err := template.New(fixedTime, "", tc.title)
+			if err != nil {
+				t.Fatalf("New returned error: %v", err)
+			}
+			if !strings.Contains(string(b), tc.want) {
+				t.Errorf("output does not contain %q:\n%s", tc.want, string(b))
+			}
+		})
 	}
 }

@@ -249,8 +249,8 @@ func TestEntries_NoConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(entries) != 3 {
-		t.Fatalf("expected 3 entries, got %d", len(entries))
+	if len(entries) != 4 {
+		t.Fatalf("expected 4 entries, got %d", len(entries))
 	}
 
 	byKey := make(map[string]config.Entry, len(entries))
@@ -524,5 +524,218 @@ func TestSetKey_FileMode(t *testing.T) {
 	}
 	if mode := info.Mode().Perm(); mode != 0o600 {
 		t.Errorf("file mode: got %o, want 0600", mode)
+	}
+}
+
+// --------------------------------------------------------------------------
+// SplitRawNew tests
+// --------------------------------------------------------------------------
+
+// TestLoad_SplitRawNew_DefaultTrue verifies that SplitRawNew is true when
+// .clinban is absent (key not present → default true).
+func TestLoad_SplitRawNew_DefaultTrue(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.SplitRawNew {
+		t.Error("SplitRawNew: expected true when .clinban absent, got false")
+	}
+}
+
+// TestLoad_SplitRawNew_DefaultTrueWhenKeyAbsent verifies that SplitRawNew is
+// true when .clinban exists but does not contain split_raw_new.
+func TestLoad_SplitRawNew_DefaultTrueWhenKeyAbsent(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeConfigFile(t, dir, `tickets_dir = "tickets"`+"\n")
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.SplitRawNew {
+		t.Error("SplitRawNew: expected true when key absent from .clinban, got false")
+	}
+}
+
+// TestLoad_SplitRawNew_ExplicitFalse verifies that SplitRawNew is false when
+// split_raw_new = false is present in .clinban.
+func TestLoad_SplitRawNew_ExplicitFalse(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeConfigFile(t, dir, "split_raw_new = false\n")
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.SplitRawNew {
+		t.Error("SplitRawNew: expected false when split_raw_new = false in .clinban, got true")
+	}
+}
+
+// TestLoad_SplitRawNew_ExplicitTrue verifies that SplitRawNew is true when
+// split_raw_new = true is present in .clinban.
+func TestLoad_SplitRawNew_ExplicitTrue(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeConfigFile(t, dir, "split_raw_new = true\n")
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.SplitRawNew {
+		t.Error("SplitRawNew: expected true when split_raw_new = true in .clinban, got false")
+	}
+}
+
+// TestLoad_SplitRawNew_SetFalseViaCLI verifies the round-trip: SetKey writes
+// split_raw_new = false and Load reads it back as false.
+func TestLoad_SplitRawNew_SetFalseViaCLI(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := config.SetKey(dir, "split_raw_new", "false"); err != nil {
+		t.Fatalf("SetKey: unexpected error: %v", err)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("Load after SetKey: unexpected error: %v", err)
+	}
+	if cfg.SplitRawNew {
+		t.Error("SplitRawNew: expected false after SetKey(..., \"false\"), got true")
+	}
+}
+
+// TestSetKey_SplitRawNew_ValidValues verifies that "true" and "false" are
+// accepted by SetKey for split_raw_new.
+func TestSetKey_SplitRawNew_ValidValues(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		value string
+		want  bool
+	}{
+		{value: "true", want: true},
+		{value: "false", want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.value, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			if err := config.SetKey(dir, "split_raw_new", tc.value); err != nil {
+				t.Fatalf("SetKey(%q): unexpected error: %v", tc.value, err)
+			}
+
+			cfg, err := config.Load(dir)
+			if err != nil {
+				t.Fatalf("Load: unexpected error: %v", err)
+			}
+			if cfg.SplitRawNew != tc.want {
+				t.Errorf("SplitRawNew: got %v, want %v", cfg.SplitRawNew, tc.want)
+			}
+		})
+	}
+}
+
+// TestSetKey_SplitRawNew_InvalidValue verifies that SetKey returns
+// ErrInvalidValue for values other than "true" and "false".
+func TestSetKey_SplitRawNew_InvalidValue(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	err := config.SetKey(dir, "split_raw_new", "maybe")
+	if err == nil {
+		t.Fatal("expected ErrInvalidValue for value \"maybe\", got nil")
+	}
+	if !errors.Is(err, config.ErrInvalidValue) {
+		t.Errorf("expected ErrInvalidValue, got: %v", err)
+	}
+}
+
+// TestEntries_SplitRawNew_Unset verifies that split_raw_new appears in Entries
+// with IsSet=false and Default="true" when the key is absent.
+func TestEntries_SplitRawNew_Unset(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	entries, err := config.Entries(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	byKey := make(map[string]config.Entry, len(entries))
+	for _, e := range entries {
+		byKey[e.Key] = e
+	}
+
+	e, ok := byKey["split_raw_new"]
+	if !ok {
+		t.Fatal("Entries: missing split_raw_new key")
+	}
+	if e.IsSet {
+		t.Error("split_raw_new: expected IsSet=false when key absent")
+	}
+	if e.Default != "true" {
+		t.Errorf("split_raw_new: Default: got %q, want %q", e.Default, "true")
+	}
+	if e.Value != "true" {
+		t.Errorf("split_raw_new: Value: got %q, want %q", e.Value, "true")
+	}
+}
+
+// TestEntries_SplitRawNew_SetFalse verifies that Entries reports IsSet=true
+// and Value="false" when split_raw_new = false is in .clinban.
+func TestEntries_SplitRawNew_SetFalse(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeConfigFile(t, dir, "split_raw_new = false\n")
+
+	entries, err := config.Entries(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	byKey := make(map[string]config.Entry, len(entries))
+	for _, e := range entries {
+		byKey[e.Key] = e
+	}
+
+	e, ok := byKey["split_raw_new"]
+	if !ok {
+		t.Fatal("Entries: missing split_raw_new key")
+	}
+	if !e.IsSet {
+		t.Error("split_raw_new: expected IsSet=true when key is present")
+	}
+	if e.Value != "false" {
+		t.Errorf("split_raw_new: Value: got %q, want %q", e.Value, "false")
+	}
+}
+
+// TestEntries_NoConfig_FourEntries verifies that Entries returns 4 entries
+// (tickets_dir, archive_dir, default_type, split_raw_new) when .clinban is absent.
+func TestEntries_NoConfig_FourEntries(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	entries, err := config.Entries(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 4 {
+		t.Fatalf("expected 4 entries, got %d", len(entries))
 	}
 }

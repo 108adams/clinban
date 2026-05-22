@@ -47,16 +47,19 @@ func Entries(root string) ([]Entry, error) {
 	configPath := filepath.Join(root, ".clinban")
 
 	// rawSet tracks which keys were explicitly present in .clinban.
+	// SplitRawNew uses *bool to distinguish absent (nil) from explicit false.
 	type rawConfig struct {
 		TicketsDir  string `toml:"tickets_dir"`
 		ArchiveDir  string `toml:"archive_dir"`
 		DefaultType string `toml:"default_type"`
+		SplitRawNew *bool  `toml:"split_raw_new"`
 	}
 
 	var raw rawConfig
 	ticketsDirSet := false
 	archiveDirSet := false
 	defaultTypeSet := false
+	splitRawNewSet := false
 
 	data, err := os.ReadFile(configPath)
 	if err != nil && !os.IsNotExist(err) {
@@ -71,6 +74,7 @@ func Entries(root string) ([]Entry, error) {
 		ticketsDirSet = raw.TicketsDir != ""
 		archiveDirSet = raw.ArchiveDir != ""
 		defaultTypeSet = raw.DefaultType != ""
+		splitRawNewSet = raw.SplitRawNew != nil
 	}
 
 	// Built-in defaults (relative, as displayed to the user).
@@ -98,6 +102,11 @@ func Entries(root string) ([]Entry, error) {
 		defaultTypeValue = raw.DefaultType
 	}
 
+	splitRawNewValue := "true" // built-in default
+	if splitRawNewSet {
+		splitRawNewValue = fmt.Sprintf("%v", *raw.SplitRawNew)
+	}
+
 	return []Entry{
 		{
 			Key:     "tickets_dir",
@@ -116,6 +125,12 @@ func Entries(root string) ([]Entry, error) {
 			Value:   defaultTypeValue,
 			Default: "", // no built-in default
 			IsSet:   defaultTypeSet,
+		},
+		{
+			Key:     "split_raw_new",
+			Value:   splitRawNewValue,
+			Default: "true",
+			IsSet:   splitRawNewSet,
 		},
 	}, nil
 }
@@ -137,6 +152,10 @@ func SetKey(root, key, value string) error {
 		if value != "" && !validDefaultTypes[value] {
 			return fmt.Errorf("%w: default_type must be one of bug, task, feature, spike; got %q", ErrInvalidValue, value)
 		}
+	case "split_raw_new":
+		if value != "true" && value != "false" {
+			return fmt.Errorf("%w: split_raw_new must be \"true\" or \"false\"; got %q", ErrInvalidValue, value)
+		}
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
@@ -144,10 +163,12 @@ func SetKey(root, key, value string) error {
 	configPath := filepath.Join(root, ".clinban")
 
 	// Read existing raw config, or start with zero value.
+	// SplitRawNew uses *bool to distinguish absent (nil) from explicit false.
 	type rawConfig struct {
 		TicketsDir  string `toml:"tickets_dir"`
 		ArchiveDir  string `toml:"archive_dir"`
 		DefaultType string `toml:"default_type"`
+		SplitRawNew *bool  `toml:"split_raw_new"`
 	}
 
 	var raw rawConfig
@@ -170,6 +191,9 @@ func SetKey(root, key, value string) error {
 		raw.ArchiveDir = value
 	case "default_type":
 		raw.DefaultType = value
+	case "split_raw_new":
+		b := value == "true"
+		raw.SplitRawNew = &b
 	}
 
 	// Marshal back to TOML.
@@ -182,6 +206,9 @@ func SetKey(root, key, value string) error {
 	}
 	if raw.DefaultType != "" {
 		buf = append(buf, []byte(fmt.Sprintf("default_type = %q\n", raw.DefaultType))...)
+	}
+	if raw.SplitRawNew != nil {
+		buf = append(buf, []byte(fmt.Sprintf("split_raw_new = %v\n", *raw.SplitRawNew))...)
 	}
 
 	// Atomic write: temp file in same directory then rename.
@@ -234,6 +261,10 @@ type Config struct {
 	// DefaultType is the ticket type used when --type is not supplied.
 	// Empty string means "not set"; validation is the caller's responsibility.
 	DefaultType string `toml:"default_type"`
+	// SplitRawNew controls whether the `new` command splits the joined
+	// positional-args string on the first `#` to pre-fill the ticket title.
+	// Default is true when the key is absent from .clinban.
+	SplitRawNew bool `toml:"split_raw_new"`
 }
 
 // Load reads .clinban from projectRoot and returns the resolved configuration.
@@ -256,10 +287,14 @@ func Load(projectRoot string) (*Config, error) {
 		return nil, fmt.Errorf("config: read .clinban: %w", err)
 	}
 
+	// SplitRawNew uses *bool so that nil (absent) is distinguishable from
+	// explicit false — TOML bool zero-value is false, which would conflict
+	// with the default-true requirement.
 	var raw struct {
 		TicketsDir  string `toml:"tickets_dir"`
 		ArchiveDir  string `toml:"archive_dir"`
 		DefaultType string `toml:"default_type"`
+		SplitRawNew *bool  `toml:"split_raw_new"`
 	}
 
 	if err := toml.Unmarshal(data, &raw); err != nil {
@@ -281,14 +316,20 @@ func Load(projectRoot string) (*Config, error) {
 
 	cfg.DefaultType = raw.DefaultType
 
+	if raw.SplitRawNew != nil {
+		cfg.SplitRawNew = *raw.SplitRawNew
+	}
+	// When nil (absent), cfg.SplitRawNew retains the default set by defaults().
+
 	return cfg, nil
 }
 
 // defaults returns a Config with all fields set to their default values.
 func defaults(projectRoot string) *Config {
 	return &Config{
-		TicketsDir: filepath.Join(projectRoot, "tickets"),
-		ArchiveDir: filepath.Join(projectRoot, "tickets", "archive"),
+		TicketsDir:  filepath.Join(projectRoot, "tickets"),
+		ArchiveDir:  filepath.Join(projectRoot, "tickets", "archive"),
+		SplitRawNew: true,
 	}
 }
 

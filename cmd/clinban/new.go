@@ -35,7 +35,13 @@ var newCmd = &cobra.Command{
 
 By default opens an editor with a pre-populated template (interactive mode).
 Use --no-interactive together with --title and --type to create a ticket
-from flags without opening an editor.`,
+from flags without opening an editor.
+
+Positional arguments are joined with spaces and appended to the template as
+body text before the editor opens. Note: an unquoted '#' preceded by
+whitespace is treated as a shell comment and stripped before Go receives the
+arguments. To include '#' literally, either escape it ('\#') or quote the
+entire string (e.g. clinban new "title # body").`,
 	SilenceUsage: true,
 	Args:         cobra.ArbitraryArgs,
 	RunE:         runNew,
@@ -62,7 +68,7 @@ func runNew(_ *cobra.Command, args []string) error {
 }
 
 // runNewInteractive is the interactive ticket-creation path (T-17).
-func runNewInteractive(body string) error {
+func runNewInteractive(raw string) error {
 	// Assign next ID.
 	nextID, err := st.NextID()
 	if err != nil {
@@ -71,13 +77,20 @@ func runNewInteractive(body string) error {
 
 	now := time.Now()
 
+	// Split raw on the first '#' when the feature is enabled.
+	title := ""
+	body := raw
+	if cfg.SplitRawNew && raw != "" {
+		title, body = splitRawBody(raw)
+	}
+
 	// Render the template. Only pass the default type when it is a valid type
 	// value; an invalid or empty config value renders as an empty type field.
 	defType := cfg.DefaultType
 	if !ticket.Type(defType).Valid() {
 		defType = ""
 	}
-	tmplBytes, err := template.New(now, defType)
+	tmplBytes, err := template.New(now, defType, title)
 	if err != nil {
 		return fmt.Errorf("new: render template: %w", err)
 	}
@@ -201,6 +214,18 @@ func readLine(r *os.File) string {
 		return strings.TrimSpace(scanner.Text())
 	}
 	return ""
+}
+
+// splitRawBody splits raw on the first '#' character.
+// The trimmed left side becomes title; the trimmed right side becomes body.
+// When no '#' is present, title is empty and body is the full trimmed raw string.
+// When raw is empty, both return values are empty strings.
+func splitRawBody(raw string) (title, body string) {
+	left, right, found := strings.Cut(raw, "#")
+	if !found {
+		return "", strings.TrimSpace(raw)
+	}
+	return strings.TrimSpace(left), strings.TrimSpace(right)
 }
 
 // runNewNonInteractive creates a ticket from flags without opening an editor.

@@ -1029,6 +1029,190 @@ func TestNewInteractiveBodyArgWithDashDash(t *testing.T) {
 	}
 }
 
+// --- splitRawBody wiring integration tests (TASK-005) ---
+
+const (
+	splitTestType = "bug"
+)
+
+// makeTypeOnlyEditorScript writes a shell script that only fills in the type
+// field (leaving title untouched). This is used when the title is already
+// pre-filled by splitRawBody before the editor opens.
+func makeTypeOnlyEditorScript(t *testing.T, dir, ticketType string) string {
+	t.Helper()
+	script := "#!/bin/sh\n" +
+		"set -e\n" +
+		// Replace 'type: ""' with the provided type.
+		"sed -i 's|type: \"\"|type: \"" + ticketType + "\"|' \"$1\"\n" +
+		"exit 0\n"
+	scriptPath := dir + "/type-only-editor.sh"
+	if err := os.WriteFile(scriptPath, []byte(script), 0o700); err != nil {
+		t.Fatalf("makeTypeOnlyEditorScript: %v", err)
+	}
+	return scriptPath
+}
+
+// TestNewInteractiveSplitEnabledWithHash verifies that when SplitRawNew is
+// true (default) and args contain "#", the title is pre-filled from the
+// left-hand side and the right-hand side appears as body text.
+//
+// Done criterion (a): Args ["title", "#", "body text"] with SplitRawNew=true
+// produce a file whose frontmatter contains title: "title" and body contains
+// "body text".
+func TestNewInteractiveSplitEnabledWithHash(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	// setupWorkDir gives SplitRawNew=true (the default).
+	root, ticketsDir, _ := setupWorkDir(t)
+	scriptDir := t.TempDir()
+
+	// The title is already pre-filled by splitRawBody, so the editor only
+	// needs to supply the type field.
+	editorScript := makeTypeOnlyEditorScript(t, scriptDir, splitTestType)
+
+	stdout, stderr, code := runNewInteractiveWithArgs(t, bin, root, editorScript, "",
+		"title", "#", "body text")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "created:") {
+		t.Errorf("stdout = %q, want 'created:' prefix", stdout)
+	}
+
+	entries, err := os.ReadDir(ticketsDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	var mdFiles []string
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			mdFiles = append(mdFiles, e.Name())
+		}
+	}
+	if len(mdFiles) == 0 {
+		t.Fatal("no ticket file created")
+	}
+
+	content, err := os.ReadFile(filepath.Join(ticketsDir, mdFiles[0]))
+	if err != nil {
+		t.Fatalf("reading ticket file: %v", err)
+	}
+	body := string(content)
+
+	if !strings.Contains(body, `title: "title"`) {
+		t.Errorf("frontmatter does not contain title: \"title\"\nfull content:\n%s", body)
+	}
+	if !strings.Contains(body, "body text") {
+		t.Errorf("file body does not contain \"body text\"\nfull content:\n%s", body)
+	}
+}
+
+// TestNewInteractiveSplitDisabledWithHash verifies that when SplitRawNew is
+// false and args contain "#", the full raw string is used as body and the
+// title remains empty.
+//
+// Done criterion (b): Args ["title", "#", "body text"] with SplitRawNew=false
+// produce title: "" in frontmatter and "title # body text" in the body area.
+func TestNewInteractiveSplitDisabledWithHash(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	// Explicitly disable split_raw_new.
+	root, ticketsDir, _ := setupWorkDirWithConfig(t, `split_raw_new = false`)
+	scriptDir := t.TempDir()
+
+	// Title will still be "" in the template, so the editor must fill both
+	// title and type.
+	editorScript := makeEditorScript(t, scriptDir, "title", splitTestType)
+
+	stdout, stderr, code := runNewInteractiveWithArgs(t, bin, root, editorScript, "",
+		"title", "#", "body text")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "created:") {
+		t.Errorf("stdout = %q, want 'created:' prefix", stdout)
+	}
+
+	entries, err := os.ReadDir(ticketsDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	var mdFiles []string
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			mdFiles = append(mdFiles, e.Name())
+		}
+	}
+	if len(mdFiles) == 0 {
+		t.Fatal("no ticket file created")
+	}
+
+	content, err := os.ReadFile(filepath.Join(ticketsDir, mdFiles[0]))
+	if err != nil {
+		t.Fatalf("reading ticket file: %v", err)
+	}
+	fileBody := string(content)
+
+	// The full raw string "title # body text" must appear in the file body
+	// (after the closing frontmatter fence).
+	if !strings.Contains(fileBody, "title # body text") {
+		t.Errorf("file does not contain raw string \"title # body text\"\nfull content:\n%s", fileBody)
+	}
+}
+
+// TestNewInteractiveSplitEnabledNoHash verifies that when SplitRawNew is true
+// but there is no "#" in args, the full string becomes body and title is "".
+//
+// Done criterion (c): Args ["just body"] with SplitRawNew=true produce
+// title: "" in frontmatter and "just body" in the body area.
+func TestNewInteractiveSplitEnabledNoHash(t *testing.T) {
+	t.Parallel()
+	bin := buildBinary(t)
+	// setupWorkDir gives SplitRawNew=true (the default).
+	root, ticketsDir, _ := setupWorkDir(t)
+	scriptDir := t.TempDir()
+
+	// No "#" means splitRawBody returns ("", "just body"), so title is still
+	// "" in the template — the editor must fill both title and type.
+	editorScript := makeEditorScript(t, scriptDir, interactiveTestTitle, splitTestType)
+
+	stdout, stderr, code := runNewInteractiveWithArgs(t, bin, root, editorScript, "",
+		"just body")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "created:") {
+		t.Errorf("stdout = %q, want 'created:' prefix", stdout)
+	}
+
+	entries, err := os.ReadDir(ticketsDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	var mdFiles []string
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			mdFiles = append(mdFiles, e.Name())
+		}
+	}
+	if len(mdFiles) == 0 {
+		t.Fatal("no ticket file created")
+	}
+
+	content, err := os.ReadFile(filepath.Join(ticketsDir, mdFiles[0]))
+	if err != nil {
+		t.Fatalf("reading ticket file: %v", err)
+	}
+	fileBody := string(content)
+
+	if !strings.Contains(fileBody, "just body") {
+		t.Errorf("file does not contain \"just body\"\nfull content:\n%s", fileBody)
+	}
+}
+
 // TestNewInteractiveNoArgsUnchanged verifies that the existing happy-path
 // behaviour is preserved when no positional args are passed.
 func TestNewInteractiveNoArgsUnchanged(t *testing.T) {
