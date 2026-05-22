@@ -121,6 +121,12 @@ links:
 - Updated: `docs/ticket-schema.md`, `cmd/clinban/schema.md`, `docs/log.md`
 - Notes: Reordered `frontmatter` struct so `title` serialises as the first YAML field. Added `# states: backlog, in-progress, blocked, done` comment below the `status` field in the new-ticket template, mirroring the existing types hint. Updated example frontmatter blocks in both schema reference docs to reflect the new field order.
 
+## [2026-05-22] fix | title field now double-quoted in new ticket frontmatter
+
+- Source: ticket 0018
+- Changed: `internal/template/template.go` — `yamlstr` func now uses `yaml.Node` with `DoubleQuotedStyle`
+- Notes: Plain-string titles were rendered unquoted (e.g. `title: my title`); now consistently `title: "my title"` like all other frontmatter fields.
+
 ## [2026-05-20] update | GitHub migration — module path and CI
 
 - Source: migration commit `6a0cd17`

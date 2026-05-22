@@ -33,7 +33,13 @@ type templateData struct {
 func New(now time.Time, defaultType, title string) ([]byte, error) {
 	tmpl, err := template.New("ticket").Funcs(template.FuncMap{
 		"yamlstr": func(s string) (string, error) {
-			b, err := yaml.Marshal(s)
+			node := &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Tag:   "!!str",
+				Value: s,
+				Style: yaml.DoubleQuotedStyle,
+			}
+			b, err := yaml.Marshal(node)
 			if err != nil {
 				return "", err
 			}

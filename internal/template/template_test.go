@@ -88,6 +88,22 @@ func TestNewTemplateStatesComment(t *testing.T) {
 	}
 }
 
+// TestNewTitleIsDoubleQuoted verifies that the title field is always rendered as
+// a double-quoted YAML scalar, consistent with status, type, created, and updated.
+func TestNewTitleIsDoubleQuoted(t *testing.T) {
+	t.Parallel()
+
+	b, err := template.New(fixedTime, "", "title not quoted")
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	want := `title: "title not quoted"`
+	if !strings.Contains(string(b), want) {
+		t.Errorf("title field not double-quoted:\n  want substring: %s\n  got:\n%s", want, string(b))
+	}
+}
+
 // TestNewTitleRoundtrip verifies that for every title string, New renders it
 // as valid YAML and ticket.Parse recovers the exact original string.
 //
