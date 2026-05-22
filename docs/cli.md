@@ -21,12 +21,13 @@ If an unrecognised command is given (e.g. `clinban view`), Clinban prints an "un
 
 ## `clinban init`
 
-Initializes a Clinban project in the current directory by creating four artifacts:
+Initializes a Clinban project in the current directory by creating five artifacts:
 
 - `tickets/` — active ticket directory
 - `tickets/archive/` — archive directory
 - `.clinban` — TOML configuration file
 - `SCHEMA.md` — human/LLM-readable reference for the ticket format, field constraints, status transitions, and agent operations
+- `.claude/skills/tickets/SKILL.md` — LLM agent skill file for ticket lifecycle operations
 
 Each created artifact is reported on stdout (`created: tickets/`, etc.). If any artifact already exists without `--force`, the command exits `1` and lists both the conflicting artifacts and the missing ones on stderr, so the user can see exactly what needs to be created.
 

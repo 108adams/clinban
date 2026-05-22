@@ -13,6 +13,12 @@ links:
 
 # Documentation Log
 
+## [2026-05-22] feature | clinban init emits .claude/skills/tickets/SKILL.md (TASK-001)
+
+- Source: `cmd/clinban/init.go`, `cmd/clinban/skills/tickets/SKILL.md`, `cmd/clinban/init_test.go`
+- Updated: `docs/cli.md`, `docs/log.md`
+- Notes: `clinban init` now creates a fifth artifact, `.claude/skills/tickets/SKILL.md`, at `.claude/skills/tickets/` relative to the project root. The file is the LLM agent skill for ticket lifecycle operations, embedded from `cmd/clinban/skills/tickets/SKILL.md` (copied verbatim from `.claude/skills/tickets/SKILL.md`). Pre-flight, `--force`, fully-initialized guard, and reporting strings all include the new artifact consistently with the existing four.
+
 ## [2026-05-22] docs | Document # title/body split feature for clinban new
 
 - Source: `cmd/clinban/new.go`, `internal/config/config.go`

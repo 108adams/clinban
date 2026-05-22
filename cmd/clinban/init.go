@@ -12,6 +12,9 @@ import (
 //go:embed schema.md
 var schemaMD string
 
+//go:embed skills/tickets/SKILL.md
+var skillMD string
+
 type initFlags struct {
 	ticketsDir string
 	archiveDir string
@@ -67,8 +70,9 @@ func runInit(flags initFlags) error {
 	}
 	absConfig := filepath.Join(cwd, ".clinban")
 
-	// Step 4: pre-flight — stat all four and record existence.
+	// Step 4: pre-flight — stat all five and record existence.
 	absSchema := filepath.Join(cwd, "SCHEMA.md")
+	absSkillFile := filepath.Join(cwd, ".claude", "skills", "tickets", "SKILL.md")
 
 	_, errTickets := os.Stat(absTickets)
 	ticketsExists := errTickets == nil
@@ -78,10 +82,12 @@ func runInit(flags initFlags) error {
 	configExists := errConfig == nil
 	_, errSchema := os.Stat(absSchema)
 	schemaExists := errSchema == nil
+	_, errSkill := os.Stat(absSkillFile)
+	skillFileExists := errSkill == nil
 
 	// Step 5: without --force, fail if any artifact exists.
 	if !flags.force {
-		if ticketsExists || archiveExists || configExists || schemaExists {
+		if ticketsExists || archiveExists || configExists || schemaExists || skillFileExists {
 			if ticketsExists {
 				fmt.Fprintln(os.Stderr, "already exists: tickets/")
 			}
@@ -93,6 +99,9 @@ func runInit(flags initFlags) error {
 			}
 			if schemaExists {
 				fmt.Fprintln(os.Stderr, "already exists: SCHEMA.md")
+			}
+			if skillFileExists {
+				fmt.Fprintln(os.Stderr, "already exists: .claude/skills/tickets/SKILL.md")
 			}
 			if !ticketsExists {
 				fmt.Fprintln(os.Stderr, "missing: tickets/")
@@ -106,13 +115,16 @@ func runInit(flags initFlags) error {
 			if !schemaExists {
 				fmt.Fprintln(os.Stderr, "missing: SCHEMA.md")
 			}
+			if !skillFileExists {
+				fmt.Fprintln(os.Stderr, "missing: .claude/skills/tickets/SKILL.md")
+			}
 			fmt.Fprintln(os.Stderr, "re-run with --force to create missing items")
 			return fmt.Errorf("init: project already partially or fully initialized")
 		}
 	}
 
 	// Step 6: with --force, fail if all artifacts exist.
-	if flags.force && ticketsExists && archiveExists && configExists && schemaExists {
+	if flags.force && ticketsExists && archiveExists && configExists && schemaExists && skillFileExists {
 		fmt.Fprintln(os.Stderr, "already fully initialized")
 		return fmt.Errorf("init: already fully initialized")
 	}
@@ -145,6 +157,16 @@ func runInit(flags initFlags) error {
 			return fmt.Errorf("init: write schema: %w", err)
 		}
 		fmt.Println("created: SCHEMA.md")
+	}
+
+	if !skillFileExists {
+		if err := os.MkdirAll(filepath.Dir(absSkillFile), 0o755); err != nil {
+			return fmt.Errorf("init: create skill dir: %w", err)
+		}
+		if err := os.WriteFile(absSkillFile, []byte(skillMD), 0o644); err != nil {
+			return fmt.Errorf("init: write skill file: %w", err)
+		}
+		fmt.Println("created: .claude/skills/tickets/SKILL.md")
 	}
 
 	return nil
