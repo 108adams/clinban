@@ -99,6 +99,21 @@ navigation changes, `docs/log.md` for the documentation maintenance record, and
 When the implementation does not require documentation changes, say that the
 wiki was checked and why no update was needed.
 
+## Communication Style
+
+- **Terse and direct.** One sentence per update. State results, not intentions.
+  "Tests pass" — not "I will now proceed to run the test suite."
+- **No trailing summaries.** Do not restate what you just did at the end of a
+  response. The diff speaks for itself.
+- **Do not ask for approval when the path is clear.** If a plan is agreed,
+  proceed to the next step without asking "shall I continue?" or "does this
+  look right?". Ask only when:
+  - Requirements conflict and you cannot resolve them from context.
+  - An action is destructive and has no safe fallback.
+  - The spec is genuinely ambiguous (missing information, not just uncertainty).
+- **No preamble.** Do not narrate what you are about to do before doing it.
+  Act, then report the outcome if it is non-obvious.
+
 ## Validation Commands
 
 In this workspace, use a writable Go build cache by default. The normal cache
