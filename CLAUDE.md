@@ -2,6 +2,13 @@
 
 Project guide is in **AGENTS.md** — MUST read that first. This file adds Claude Code-specific workflow on top of it.
 
+## Pipeline Workflow
+
+Global workflow. See `~/.claude/CLAUDE.md`.
+Skills: `/ba`, `/po`, `/architect`, `/techlead`, `/dev`, `/ship`, `/tickets`, `/cross-review`, `/request-review`
+
+Project-specific: `/librarian` (docs/ wiki), `/dev` (launches Go dev-agent).
+
 ## Skills
 
 Use skills before acting:
