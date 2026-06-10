@@ -112,6 +112,15 @@ clinban lint <id>     # single ticket
 
 Run lint after any direct file edit to confirm frontmatter is still valid.
 
+If lint reports duplicate filename IDs after a git sync, run:
+
+```bash
+clinban resolve
+```
+
+It keeps the oldest conflicting ticket at the original ID and renames younger
+conflicting tickets to the next available IDs.
+
 ---
 
 ## Rules
@@ -124,6 +133,8 @@ Run lint after any direct file edit to confirm frontmatter is still valid.
 - Body below `---` is freeform — edit freely, but do not bleed content into frontmatter.
 - One ticket per unit of work. If a ticket covers two separable outcomes, split it.
 - Adopt externally written ticket files with `clinban register <path>`, not direct writes.
+- Use `clinban resolve` for duplicate filename IDs; do not manually rename
+  conflicting ticket files.
 
 ---
 

@@ -54,3 +54,14 @@ type Record struct {
 	// InArchive reports whether Path is under the configured archive directory.
 	InArchive bool
 }
+
+// ManagedFile describes a ticket file whose name follows Clinban's managed
+// ticket filename convention.
+type ManagedFile struct {
+	// ID is the zero-padded four-digit filename prefix.
+	ID string
+	// Path is the full filesystem path to the managed file.
+	Path string
+	// InArchive reports whether Path is under the configured archive directory.
+	InArchive bool
+}

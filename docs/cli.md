@@ -3,7 +3,7 @@ title: CLI Reference
 kind: reference
 scope: cli
 summary: Documents Clinban commands, expected outputs, and exit-code conventions.
-updated: 2026-05-22
+updated: 2026-06-10
 links:
   - ticket-schema
   - configuration
@@ -152,6 +152,31 @@ Exit codes:
 - `0` — file removed; prints `removed: <filename>` to stdout
 - `1` — ticket not found; prints `ticket not found` to stderr
 - `1` — multiple files share the ID (collision); lists all colliding filenames on stderr and suggests running `clinban lint`
+
+## `clinban resolve`
+
+Repairs duplicate ticket IDs across active and archived tickets by renaming the younger files in each duplicate-ID group.
+
+For each duplicate ID, Clinban parses the conflicting files, keeps the ticket with the oldest `created` timestamp at the original ID, and renames later tickets to the next available four-digit IDs. If timestamps tie, path order is the deterministic tie-breaker.
+
+Ticket contents are not rewritten. The `updated` timestamp is unchanged because the ID is derived from the filename, not frontmatter.
+
+When there are no conflicts, the command exits `0` and prints:
+
+```text
+no conflicts found
+```
+
+For each rename, the command prints:
+
+```text
+renamed: tickets/0023-fix-parser.md -> tickets/0024-fix-parser.md
+```
+
+Exit codes:
+
+- `0` — no conflicts exist or all conflicts were resolved
+- `1` — a conflicting ticket cannot be parsed, has no valid `created` timestamp, a destination already exists, or a filesystem rename fails
 
 ## `clinban lint [id]`
 

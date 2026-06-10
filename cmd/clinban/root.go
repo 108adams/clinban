@@ -20,6 +20,9 @@ var st *store.Store
 // may read it directly when they need path information.
 var cfg *config.Config
 
+// projectRoot is the root directory used to resolve the active configuration.
+var projectRoot string
+
 var rootCmd = &cobra.Command{
 	Use:   "clinban",
 	Short: "Clinban — a kanban board backed by markdown files",
@@ -38,6 +41,7 @@ archived when done.`,
 	// loads configuration, and initialises the package-level store.
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		root := findProjectRoot()
+		projectRoot = root
 
 		var err error
 		cfg, err = config.Load(root)

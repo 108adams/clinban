@@ -3,7 +3,7 @@ title: Documentation Log
 kind: log
 scope: docs
 summary: Records chronological maintenance activity for the Clinban documentation wiki.
-updated: 2026-05-22
+updated: 2026-06-10
 links:
   - index
   - schema
@@ -12,6 +12,12 @@ links:
 ---
 
 # Documentation Log
+
+## [2026-06-10] feature | clinban resolve command
+
+- Source: `tickets/0022-add-conflict-resolution-command.md`, `cmd/clinban/resolve.go`, `internal/store/scan.go`, `internal/store/move.go`
+- Updated: `docs/cli.md`, `docs/storage.md`, `docs/validation.md`, `cmd/clinban/schema.md`, `docs/log.md`
+- Notes: Documented duplicate ticket ID repair with `clinban resolve`, including oldest-created retention, filename-only renumbering, archive preservation, and lint's detection role.
 
 ## [2026-05-22] feature | clinban init emits .claude/skills/tickets/SKILL.md (TASK-001)
 

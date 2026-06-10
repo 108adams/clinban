@@ -3,7 +3,7 @@ title: Validation
 kind: reference
 scope: validation
 summary: Explains parse errors, lint rules, and workflow transition enforcement.
-updated: 2026-05-21
+updated: 2026-06-10
 links:
   - ticket-schema
   - cli
@@ -33,6 +33,8 @@ Rules run in order:
 3. **`type` is valid:** must be one of `bug`, `task`, `feature`, `spike`. Skipped if `type` is empty (rule 1 already flags that).
 4. **`tags` contains only non-empty strings:** each element in the `tags` list must be a non-empty, non-blank string.
 5. **`id` is unique:** `t.ID` must appear exactly once across all active and archived tickets.
+
+Duplicate IDs are repairable with `clinban resolve`. Lint reports the collision; resolve renames the younger files in each duplicate-ID group so the filename-derived IDs become unique again.
 
 Lint errors are printed one per line:
 

@@ -190,6 +190,54 @@ func (s *Store) AllIDs() ([]string, error) {
 	return result, nil
 }
 
+// ManagedFiles returns all active and archived files whose names follow the
+// managed ticket filename convention.
+//
+// Unlike ListActive and ListArchive, ManagedFiles does not parse ticket
+// contents. It is intended for filesystem operations such as collision repair
+// where unrelated malformed tickets should not block inventory.
+func (s *Store) ManagedFiles() ([]ManagedFile, error) {
+	active, err := managedFilesInDir(s.TicketsDir, false)
+	if err != nil {
+		return nil, err
+	}
+	archive, err := managedFilesInDir(s.ArchiveDir, true)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]ManagedFile, 0, len(active)+len(archive))
+	result = append(result, active...)
+	result = append(result, archive...)
+	return result, nil
+}
+
+func managedFilesInDir(dir string, inArchive bool) ([]ManagedFile, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []ManagedFile{}, nil
+		}
+		return nil, fmt.Errorf("store: managed files %s: %w", dir, err)
+	}
+
+	files := make([]ManagedFile, 0, len(entries))
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		m := idPattern.FindStringSubmatch(e.Name())
+		if m == nil {
+			continue
+		}
+		files = append(files, ManagedFile{
+			ID:        m[1],
+			Path:      filepath.Join(dir, e.Name()),
+			InArchive: inArchive,
+		})
+	}
+	return files, nil
+}
+
 // listDir reads all *.md files in dir, parses each as a Ticket, and returns
 // Records with InArchive set to the given flag. Non-matching filenames are
 // silently skipped. If dir does not exist, returns empty slice (no error).

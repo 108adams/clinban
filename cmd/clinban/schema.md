@@ -219,3 +219,16 @@ directory). Use this only when a ticket should be fully discarded.
 3. If no file matches the ID, Clinban exits 1 with `ticket not found`.
 4. If multiple files share the ID (a collision), Clinban exits 1, lists all
    colliding filenames, and suggests running `clinban lint` to diagnose.
+
+### 6.6 Resolve duplicate IDs
+
+Use this when git sync introduces multiple ticket files with the same
+four-digit filename prefix.
+
+1. Run `clinban lint` to confirm the collision.
+2. Run `clinban resolve`.
+3. Clinban keeps the oldest ticket in each duplicate-ID group at the original
+   ID and renames younger tickets to the next available IDs.
+4. Ticket contents are not rewritten; `updated` is unchanged.
+5. Run `clinban lint` again. ID uniqueness errors should be gone, though
+   unrelated schema errors may still remain.

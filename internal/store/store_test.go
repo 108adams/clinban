@@ -875,3 +875,99 @@ func TestListArchiveEmptyOrAbsent(t *testing.T) {
 		t.Errorf("ListArchive returned %d records, want 0", len(records))
 	}
 }
+
+// ---- TestManagedFiles ----
+
+func TestManagedFilesIncludesActiveAndArchive(t *testing.T) {
+	t.Parallel()
+	s := newStore(t)
+	if err := os.MkdirAll(s.ArchiveDir, 0o755); err != nil {
+		t.Fatalf("mkdir archive: %v", err)
+	}
+	active := writeTicketFile(t, s.TicketsDir, "0001-active.md", makeTicket("0001", testTitle))
+	archived := writeTicketFile(t, s.ArchiveDir, "0002-archived.md", makeTicket("0002", testTitle2))
+
+	files, err := s.ManagedFiles()
+	if err != nil {
+		t.Fatalf("ManagedFiles error: %v", err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("ManagedFiles returned %d files, want 2", len(files))
+	}
+
+	seen := map[string]store.ManagedFile{}
+	for _, file := range files {
+		seen[file.Path] = file
+	}
+	if got := seen[active]; got.ID != "0001" || got.InArchive {
+		t.Errorf("active record = %+v, want ID 0001 and InArchive=false", got)
+	}
+	if got := seen[archived]; got.ID != "0002" || !got.InArchive {
+		t.Errorf("archive record = %+v, want ID 0002 and InArchive=true", got)
+	}
+}
+
+func TestManagedFilesIgnoresNonManagedFiles(t *testing.T) {
+	t.Parallel()
+	s := newStore(t)
+	if err := os.WriteFile(filepath.Join(s.TicketsDir, "README.md"), []byte("ignore"), 0o600); err != nil {
+		t.Fatalf("write readme: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(s.TicketsDir, "0001-note.txt"), []byte("ignore"), 0o600); err != nil {
+		t.Fatalf("write txt: %v", err)
+	}
+	writeTicketFile(t, s.TicketsDir, "0002-ticket.md", makeTicket("0002", testTitle))
+
+	files, err := s.ManagedFiles()
+	if err != nil {
+		t.Fatalf("ManagedFiles error: %v", err)
+	}
+	if len(files) != 1 {
+		t.Fatalf("ManagedFiles returned %d files, want 1", len(files))
+	}
+	if files[0].ID != "0002" {
+		t.Errorf("ManagedFiles ID = %q, want 0002", files[0].ID)
+	}
+}
+
+// ---- TestRenameWithinDir ----
+
+func TestRenameWithinDirRefusesExistingDestination(t *testing.T) {
+	t.Parallel()
+	s := newStore(t)
+	src := writeTicketFile(t, s.TicketsDir, "0001-source.md", makeTicket("0001", testTitle))
+	writeTicketFile(t, s.TicketsDir, "0002-dest.md", makeTicket("0002", testTitle2))
+
+	_, err := s.RenameWithinDir(src, "0002-dest.md")
+	if err == nil {
+		t.Fatal("RenameWithinDir: expected destination collision error, got nil")
+	}
+	if _, statErr := os.Stat(src); statErr != nil {
+		t.Errorf("source missing after failed rename: %v", statErr)
+	}
+}
+
+func TestRenameWithinDirPreservesContent(t *testing.T) {
+	t.Parallel()
+	s := newStore(t)
+	src := writeTicketFile(t, s.TicketsDir, "0001-source.md", makeTicket("0001", testTitle))
+	before, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatalf("read before: %v", err)
+	}
+
+	dest, err := s.RenameWithinDir(src, "0002-source.md")
+	if err != nil {
+		t.Fatalf("RenameWithinDir error: %v", err)
+	}
+	after, err := os.ReadFile(dest)
+	if err != nil {
+		t.Fatalf("read after: %v", err)
+	}
+	if string(after) != string(before) {
+		t.Errorf("renamed content changed\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+	if _, err := os.Stat(src); !os.IsNotExist(err) {
+		t.Errorf("source still exists after rename or unexpected stat error: %v", err)
+	}
+}

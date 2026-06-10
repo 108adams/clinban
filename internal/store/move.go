@@ -51,3 +51,26 @@ func (s *Store) MoveToActive(path string) (string, error) {
 	}
 	return dest, nil
 }
+
+// RenameWithinDir renames path to newBase in the same directory and returns
+// the new full path.
+//
+// The operation refuses to overwrite an existing destination and uses
+// os.Link + os.Remove to match the collision behavior of ticket moves.
+func (s *Store) RenameWithinDir(path, newBase string) (string, error) {
+	if newBase != filepath.Base(newBase) {
+		return "", fmt.Errorf("store: rename: new basename contains path separators: %s", newBase)
+	}
+	dest := filepath.Join(filepath.Dir(path), newBase)
+	if err := os.Link(path, dest); err != nil {
+		if errors.Is(err, fs.ErrExist) {
+			return "", fmt.Errorf("store: rename: destination already exists: %s", filepath.Base(dest))
+		}
+		return "", fmt.Errorf("store: rename: link: %w", err)
+	}
+
+	if err := os.Remove(path); err != nil {
+		return "", fmt.Errorf("store: rename: remove: %w", err)
+	}
+	return dest, nil
+}

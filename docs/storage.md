@@ -3,7 +3,7 @@ title: Storage
 kind: reference
 scope: storage
 summary: Describes Clinban filesystem layout, ticket discovery, ID scanning, writes, and archiving.
-updated: 2026-05-19
+updated: 2026-06-10
 links:
   - ticket-schema
   - configuration
@@ -42,6 +42,14 @@ Non-matching Markdown files are ignored by list/archive scans. This allows READM
 Clinban scans active and archived filenames, finds the highest four-digit prefix, and assigns the next integer.
 
 ID uniqueness is enforced across active and archived tickets.
+
+## ID Conflict Resolution
+
+`clinban resolve` repairs duplicate filename IDs across active and archived tickets. It builds a full managed-file inventory, groups files by ID, and only parses files in duplicate groups.
+
+Within each duplicate group, the oldest ticket by `created` timestamp keeps the original ID. Younger tickets are renamed to IDs above the current repository maximum. Active tickets remain in the active directory, archived tickets remain in the archive directory, and ticket contents are not rewritten.
+
+Resolution refuses planned destination collisions before applying renames. Each rename is performed within the same directory and refuses to overwrite an existing file.
 
 ## Writes
 
