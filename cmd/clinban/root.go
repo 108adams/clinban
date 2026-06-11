@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -70,6 +71,19 @@ func Execute() {
 		_ = rootCmd.Help()
 		os.Exit(1)
 	}
+}
+
+// displayPath returns path relative to projectRoot when possible, falling back
+// to the absolute path when projectRoot is unset or path escapes it.
+func displayPath(path string) string {
+	if projectRoot == "" {
+		return path
+	}
+	rel, err := filepath.Rel(projectRoot, path)
+	if err != nil || rel == "." || rel == "" || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return path
+	}
+	return rel
 }
 
 // findProjectRoot walks upward from the current directory looking for .clinban.

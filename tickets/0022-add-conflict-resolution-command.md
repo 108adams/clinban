@@ -1,12 +1,10 @@
 ---
-title: "Add conflict resolution command"
-status: "backlog"
-# states: backlog, in-progress, blocked, done
-type: "feature"
-# types: bug, task, feature, spike
-tags: ["cli", "storage", "conflicts"]
-created: "2026-06-10T18:56:21+02:00"
-updated: "2026-06-10T18:56:21+02:00"
+title: Add conflict resolution command
+status: done
+type: feature
+tags: [cli, storage, conflicts]
+created: 2026-06-10T18:56:21+02:00
+updated: 2026-06-10T19:22:10.820122875+02:00
 ---
 
 # Add `clinban resolve`

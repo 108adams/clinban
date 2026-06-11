@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -39,7 +38,7 @@ type resolveTicket struct {
 
 type resolveRename struct {
 	oldPath string
-	newPath string
+	newBase string
 }
 
 func runResolve(_ *cobra.Command, _ []string) error {
@@ -59,7 +58,7 @@ func runResolve(_ *cobra.Command, _ []string) error {
 	}
 
 	for _, item := range plan {
-		newPath, err := st.RenameWithinDir(item.oldPath, filepath.Base(item.newPath))
+		newPath, err := st.RenameWithinDir(item.oldPath, item.newBase)
 		if err != nil {
 			return fmt.Errorf("resolve: rename %s: %w", filepath.Base(item.oldPath), err)
 		}
@@ -94,7 +93,6 @@ func planResolve(files []store.ManagedFile) ([]resolveRename, error) {
 		return ni < nj
 	})
 
-	plannedDests := map[string]bool{}
 	var plan []resolveRename
 	nextID := maxID + 1
 	for _, id := range ids {
@@ -117,18 +115,14 @@ func planResolve(files []store.ManagedFile) ([]resolveRename, error) {
 			nextID++
 			newBase := newID + filepath.Base(item.file.Path)[4:]
 			newPath := filepath.Join(filepath.Dir(item.file.Path), newBase)
-			if plannedDests[newPath] {
-				return nil, fmt.Errorf("resolve: planned duplicate destination: %s", displayPath(newPath))
-			}
 			if _, err := os.Stat(newPath); err == nil {
 				return nil, fmt.Errorf("resolve: destination already exists: %s", displayPath(newPath))
 			} else if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("resolve: check destination %s: %w", displayPath(newPath), err)
 			}
-			plannedDests[newPath] = true
 			plan = append(plan, resolveRename{
 				oldPath: item.file.Path,
-				newPath: newPath,
+				newBase: newBase,
 			})
 		}
 	}
@@ -142,24 +136,12 @@ func readResolveGroup(files []store.ManagedFile) ([]resolveTicket, error) {
 		if err != nil {
 			return nil, fmt.Errorf("resolve: read %s: %w", displayPath(file.Path), err)
 		}
-		if t.Created.IsZero() {
-			return nil, fmt.Errorf("resolve: ticket %s has empty created timestamp", displayPath(file.Path))
-		}
+		// Zero Created (field absent from frontmatter) sorts before any real
+		// timestamp, so the ticket is treated as the oldest and keeps its ID.
 		tickets = append(tickets, resolveTicket{
 			file:    file,
 			created: t.Created,
 		})
 	}
 	return tickets, nil
-}
-
-func displayPath(path string) string {
-	if projectRoot == "" {
-		return path
-	}
-	rel, err := filepath.Rel(projectRoot, path)
-	if err != nil || rel == "." || rel == "" || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return path
-	}
-	return rel
 }
