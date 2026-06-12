@@ -22,32 +22,44 @@ SIGKILL between phases is explicitly out of scope.
 
 ## Execution Model
 
-Replace the current one-by-one rename loop with a two-phase batch:
+Replace the current one-by-one rename loop with a two-phase batch built on hard links (`os.Link` + `os.Remove`, matching the existing single-file rename primitive). After a `Link`, the old and new names refer to the same underlying file.
 
-**Phase 1 — Link:** call `os.Link(oldPath, destPath)` for every rename in the plan. On the first failure, remove all destination links created so far and exit 1. No source file has been touched.
+**Phase 1 — Link:** call `os.Link(oldPath, destPath)` for every rename in the plan. On the first failure, remove every destination link created so far and exit 1. No source file has been touched — zero net change.
 
-**Phase 2 — Remove:** call `os.Remove(oldPath)` for every rename. On the first failure, remove all destination links (full phase-1 cleanup) and exit 1. Zero net change to the store.
+**Phase 2 — Remove:** call `os.Remove(oldPath)` for every rename, tracking which sources have been removed. On the first failure, roll back in this order, then exit 1:
 
-If rollback itself fails (cannot remove a destination link), report both the original error and the rollback error. The store may be inconsistent in this case — document it in the error message. Attempt all rollback removals even if one fails.
+1. **Restore** — for every source already removed in this phase, re-create it with `os.Link(destPath, oldPath)`. The destination still holds the file, so this brings back the original name.
+2. **Clean up** — remove every destination link created in Phase 1.
+
+After rollback every original name is present and no destination link remains: zero net change.
+
+> Why restore is required: once `os.Remove(oldPath)` succeeds, the destination link is the *only* remaining name for that file. Removing destination links without restoring first would delete those tickets. Simply "removing all destination links" is only safe when Phase 2 fails on its very first item (nothing removed yet).
+
+If rollback itself fails (a restore re-link or a destination removal cannot complete), report the original error plus every rollback error. The store may be inconsistent in this case — say so in the output. Attempt all rollback steps even if one fails.
 
 ## Error Messages
 
 - Link failure: `resolve: link <basename>: <os error>`
 - Remove failure: `resolve: remove <basename>: <os error>`
-- Rollback failure (additional): `resolve: rollback: remove <basename>: <os error>`
+- Rollback, destination cleanup failure: `resolve: rollback: remove <basename>: <os error>`
+- Rollback, source restore failure: `resolve: rollback: link <basename>: <os error>`
+
+`<basename>` is the basename of the ticket file involved in the failed operation.
 
 ## Edge Cases
 
 - Phase 1 fails at item N → clean up links 0..N-1, exit 1, zero net change
-- Phase 2 fails at item N → clean up all destination links (full phase-1 cleanup), exit 1, zero net change
-- Rollback fails for one or more destinations → report original + rollback errors; store may be inconsistent; this is a known limitation
+- Phase 2 fails on the first item (nothing removed yet) → clean up all destination links (no restore needed), exit 1, zero net change
+- Phase 2 fails at item N>1 → restore the sources removed for items 0..N-1, then clean up all destination links, exit 1, zero net change
+- Rollback fails for one or more sources or destinations → report original + all rollback errors; store may be inconsistent; this is a known limitation
 - Concurrent resolve processes → undefined behaviour; no locking in scope
 - SIGKILL between phases → undefined; explicitly out of scope
 
 ## Acceptance Criteria
 
 - [ ] Given a 3-rename plan, when the 3rd Link fails, then no files are renamed and exit code is 1
-- [ ] Given all Links succeed, when the 1st Remove fails, then all destination links are removed and exit code is 1
+- [ ] Given all Links succeed, when the 1st Remove fails, then all destination links are removed, every original file is untouched, and exit code is 1
+- [ ] Given all Links succeed, when the 2nd Remove fails after the 1st succeeded, then every original ticket file is restored at its original path with identical content, no destination link remains, and exit code is 1
 - [ ] Given a complete successful run, then each ticket file is at its new path with identical content and the old path is gone
 - [ ] Given no conflicts, then "no conflicts found" is printed, exit 0, and no filesystem changes occur
 - [ ] Given a successful run, `clinban lint` reports no duplicate ID errors
@@ -56,7 +68,9 @@ If rollback itself fails (cannot remove a destination link), report both the ori
 ## Tests Required
 
 - Phase-1 failure: pre-create a destination file between plan build and execution to force a Link failure on a specific item; assert no other files were renamed
-- Phase-2 Remove failure: make a source directory read-only (`chmod 0555`) to block Remove; assert all destination links are cleaned up and exit code is 1
+- Phase-2 Remove failure on the first item: make a source directory read-only (`chmod 0555`) to block Remove; assert all destination links are cleaned up, exit code is 1
+- Phase-2 Remove failure after a prior success (item N>1): force Remove to fail on a later item; assert already-removed sources are restored to their original paths and no destination link remains
+- Note: `chmod 0555` does not block removal when the test runs as root; guard the permission-based tests with a skip when `os.Geteuid() == 0`
 - Existing tests must pass without modification
 
 ## Out of Scope
