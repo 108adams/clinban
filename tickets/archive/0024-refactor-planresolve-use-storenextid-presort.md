@@ -1,10 +1,10 @@
 ---
 title: 'refactor: planResolve — use store.NextID, pre-sort IDs, single-pass group build'
-status: backlog
+status: done
 type: task
 tags: [cli, resolve, refactor]
 created: 2026-06-11T10:50:23.71484912+02:00
-updated: 2026-06-11T10:50:23.71484912+02:00
+updated: 2026-06-14T18:06:20.070502031+02:00
 ---
 
 ## Background

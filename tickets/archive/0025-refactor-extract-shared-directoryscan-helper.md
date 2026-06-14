@@ -1,10 +1,10 @@
 ---
 title: 'refactor: extract shared directory-scan helper in store/scan.go'
-status: backlog
+status: done
 type: task
 tags: [store, refactor, cleanup]
 created: 2026-06-11T10:50:26.683958138+02:00
-updated: 2026-06-11T10:50:26.683958138+02:00
+updated: 2026-06-14T18:06:20.039901424+02:00
 ---
 
 ## Background

@@ -1,10 +1,10 @@
 ---
 title: 'GitHub release cycle: tag, release notes, and artefacts'
-status: backlog
+status: done
 type: task
 tags: [ci, release, github]
 created: 2026-06-14T11:53:36.817332345+02:00
-updated: 2026-06-14T11:53:36.817332345+02:00
+updated: 2026-06-14T17:56:53.621892857+02:00
 ---
 Offspring of ticket 0020 (version command + ldflags injection).
 
