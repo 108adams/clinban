@@ -69,33 +69,33 @@ func runResolve(_ *cobra.Command, _ []string) error {
 
 func planResolve(files []store.ManagedFile) ([]resolveRename, error) {
 	groups := map[string][]store.ManagedFile{}
-	maxID := 0
 	for _, file := range files {
 		groups[file.ID] = append(groups[file.ID], file)
-		n, err := strconv.Atoi(file.ID)
-		if err != nil {
-			return nil, fmt.Errorf("resolve: parse id %q: %w", file.ID, err)
-		}
-		if n > maxID {
-			maxID = n
-		}
 	}
 
-	ids := make([]string, 0, len(groups))
-	for id, group := range groups {
-		if len(group) > 1 {
-			ids = append(ids, id)
-		}
+	nextID, err := st.NextID()
+	if err != nil {
+		return nil, fmt.Errorf("resolve: next id: %w", err)
 	}
-	sort.Slice(ids, func(i, j int) bool {
-		ni, _ := strconv.Atoi(ids[i])
-		nj, _ := strconv.Atoi(ids[j])
-		return ni < nj
-	})
+
+	dupNums := make([]int, 0, len(groups))
+	dupMap := map[int]string{}
+	for id, group := range groups {
+		if len(group) < 2 {
+			continue
+		}
+		n, err := strconv.Atoi(id)
+		if err != nil {
+			return nil, fmt.Errorf("resolve: parse id %q: %w", id, err)
+		}
+		dupNums = append(dupNums, n)
+		dupMap[n] = id
+	}
+	sort.Ints(dupNums)
 
 	var plan []resolveRename
-	nextID := maxID + 1
-	for _, id := range ids {
+	for _, n := range dupNums {
+		id := dupMap[n]
 		tickets, err := readResolveGroup(groups[id])
 		if err != nil {
 			return nil, err
