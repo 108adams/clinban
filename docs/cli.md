@@ -244,3 +244,27 @@ Each shell-specific subcommand prints the completion script to stdout. Use the s
 ```bash
 clinban completion zsh --help
 ```
+
+## `clinban --version`
+
+Prints the binary version and exits.
+
+```bash
+clinban --version
+```
+
+Output on a release build:
+
+```text
+clinban version v0.1.0
+```
+
+Output on a local build (no `-ldflags` injection):
+
+```text
+clinban version dev
+```
+
+The version string is injected at build time via `-ldflags "-X main.version=<tag>"`. Release binaries downloaded from GitHub Releases always report the tag they were built from (e.g. `v0.1.0`). Binaries compiled locally with `go build` or `go install` without the flag report `dev`.
+
+To check whether a newer release is available, compare the output against the latest tag on the [GitHub Releases page](https://github.com/108adams/clinban/releases).

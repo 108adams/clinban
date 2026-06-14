@@ -14,7 +14,7 @@ help:
 	@echo "  clean    remove local ./clinban binary"
 
 build:
-	go build -o clinban ./cmd/clinban
+	go build -ldflags "-X main.version=$$(git describe --tags --always --dirty)" -o clinban ./cmd/clinban
 
 install:
 	go install ./cmd/clinban

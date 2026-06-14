@@ -13,6 +13,10 @@ import (
 	"github.com/108adams/clinban/internal/store"
 )
 
+// version is set at build time via -ldflags "-X main.version=<value>".
+// Falls back to "dev" for local builds without the flag.
+var version = "dev"
+
 // st is the package-level Store used by all subcommands. It is initialised by
 // rootCmd's PersistentPreRun before any subcommand runs.
 var st *store.Store
@@ -25,8 +29,9 @@ var cfg *config.Config
 var projectRoot string
 
 var rootCmd = &cobra.Command{
-	Use:   "clinban",
-	Short: "Clinban — a kanban board backed by markdown files",
+	Use:     "clinban",
+	Version: version,
+	Short:   "Clinban — a kanban board backed by markdown files",
 	Long: `Clinban manages kanban tickets as markdown files in your project directory.
 
 Each ticket is a markdown file with YAML frontmatter that records its ID, status,

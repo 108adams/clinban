@@ -3,7 +3,7 @@ title: Documentation Log
 kind: log
 scope: docs
 summary: Records chronological maintenance activity for the Clinban documentation wiki.
-updated: 2026-06-10
+updated: 2026-06-14
 links:
   - index
   - schema
@@ -12,6 +12,12 @@ links:
 ---
 
 # Documentation Log
+
+## [2026-06-14] feature | version flag and release workflow (ticket 0020)
+
+- Source: `tickets/0020-version-command.md`, `.github/workflows/release.yml`
+- Updated: `docs/cli.md`, `docs/log.md`
+- Notes: Cobra `Version` field wired to `main.version` (default `"dev"`, injected via `-ldflags` on release builds). Added `.github/workflows/release.yml`: triggers on `v*` tag push, cross-compiles for linux/amd64, darwin/arm64, windows/amd64 on ubuntu-latest with `CGO_ENABLED=0`, uploads per-binary `.sha256` checksums and release binaries via `softprops/action-gh-release@v2` with auto-generated release notes. Documented `--version` flag in `docs/cli.md` with output examples for release and local builds.
 
 ## [2026-06-10] feature | clinban resolve command
 
