@@ -12,9 +12,15 @@ import (
 // 4-digit numeric prefix.
 var idPattern = regexp.MustCompile(`^([0-9]{4})-.*\.md$`)
 
-// scanDir collects all numeric ID prefixes from *.md files in dir whose names
-// match idPattern. If dir does not exist, it is treated as empty (no error).
-func scanDir(dir string) ([]int, error) {
+// scanEntry holds the matched components of a single managed ticket filename.
+type scanEntry struct {
+	id   string // zero-padded 4-digit prefix, e.g. "0042"
+	path string // full absolute path to the file
+}
+
+// scanEntries reads dir and returns one scanEntry per file whose name matches
+// idPattern. If dir does not exist it is treated as empty (no error returned).
+func scanEntries(dir string) ([]scanEntry, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -23,7 +29,7 @@ func scanDir(dir string) ([]int, error) {
 		return nil, fmt.Errorf("store: scan %s: %w", dir, err)
 	}
 
-	var ids []int
+	var out []scanEntry
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
@@ -32,8 +38,23 @@ func scanDir(dir string) ([]int, error) {
 		if m == nil {
 			continue
 		}
-		n, err := strconv.Atoi(m[1])
-		if err != nil {
+		out = append(out, scanEntry{id: m[1], path: filepath.Join(dir, e.Name())})
+	}
+	return out, nil
+}
+
+// scanDir collects all numeric ID prefixes from *.md files in dir whose names
+// match idPattern. If dir does not exist, it is treated as empty (no error).
+func scanDir(dir string) ([]int, error) {
+	entries, err := scanEntries(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var ids []int
+	for _, e := range entries {
+		n, convErr := strconv.Atoi(e.id)
+		if convErr != nil {
 			// Shouldn't happen given the regex, but guard anyway.
 			continue
 		}
@@ -45,24 +66,14 @@ func scanDir(dir string) ([]int, error) {
 // scanDirIDs collects all 4-digit ID prefix strings (zero-padded) from *.md
 // files in dir. If dir does not exist, it is treated as empty (no error).
 func scanDirIDs(dir string) ([]string, error) {
-	entries, err := os.ReadDir(dir)
+	entries, err := scanEntries(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("store: scan ids %s: %w", dir, err)
+		return nil, err
 	}
 
 	var ids []string
 	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		m := idPattern.FindStringSubmatch(e.Name())
-		if m == nil {
-			continue
-		}
-		ids = append(ids, m[1])
+		ids = append(ids, e.id)
 	}
 	return ids, nil
 }
@@ -109,24 +120,13 @@ func (s *Store) FindByID(id string) (path string, inArchive bool, err error) {
 		id = fmt.Sprintf("%04d", n)
 	}
 	for _, dir := range []string{s.TicketsDir, s.ArchiveDir} {
-		entries, readErr := os.ReadDir(dir)
-		if readErr != nil {
-			if os.IsNotExist(readErr) {
-				continue
-			}
-			return "", false, fmt.Errorf("store: find %s: %w", id, readErr)
+		entries, scanErr := scanEntries(dir)
+		if scanErr != nil {
+			return "", false, scanErr
 		}
 		for _, e := range entries {
-			if e.IsDir() {
-				continue
-			}
-			m := idPattern.FindStringSubmatch(e.Name())
-			if m == nil {
-				continue
-			}
-			if m[1] == id {
-				full := filepath.Join(dir, e.Name())
-				return full, dir == s.ArchiveDir, nil
+			if e.id == id {
+				return e.path, dir == s.ArchiveDir, nil
 			}
 		}
 	}
@@ -147,23 +147,13 @@ func (s *Store) FindAllByID(id string) ([]string, error) {
 	}
 	paths := []string{}
 	for _, dir := range []string{s.TicketsDir, s.ArchiveDir} {
-		entries, readErr := os.ReadDir(dir)
-		if readErr != nil {
-			if os.IsNotExist(readErr) {
-				continue
-			}
-			return nil, fmt.Errorf("store: find all %s: %w", id, readErr)
+		entries, scanErr := scanEntries(dir)
+		if scanErr != nil {
+			return nil, scanErr
 		}
 		for _, e := range entries {
-			if e.IsDir() {
-				continue
-			}
-			m := idPattern.FindStringSubmatch(e.Name())
-			if m == nil {
-				continue
-			}
-			if m[1] == id {
-				paths = append(paths, filepath.Join(dir, e.Name()))
+			if e.id == id {
+				paths = append(paths, e.path)
 			}
 		}
 	}
@@ -212,26 +202,16 @@ func (s *Store) ManagedFiles() ([]ManagedFile, error) {
 }
 
 func managedFilesInDir(dir string, inArchive bool) ([]ManagedFile, error) {
-	entries, err := os.ReadDir(dir)
+	entries, err := scanEntries(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return []ManagedFile{}, nil
-		}
-		return nil, fmt.Errorf("store: managed files %s: %w", dir, err)
+		return nil, err
 	}
 
 	files := make([]ManagedFile, 0, len(entries))
 	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		m := idPattern.FindStringSubmatch(e.Name())
-		if m == nil {
-			continue
-		}
 		files = append(files, ManagedFile{
-			ID:        m[1],
-			Path:      filepath.Join(dir, e.Name()),
+			ID:        e.id,
+			Path:      e.path,
 			InArchive: inArchive,
 		})
 	}
@@ -242,30 +222,20 @@ func managedFilesInDir(dir string, inArchive bool) ([]ManagedFile, error) {
 // Records with InArchive set to the given flag. Non-matching filenames are
 // silently skipped. If dir does not exist, returns empty slice (no error).
 func (s *Store) listDir(dir string, inArchive bool) ([]Record, error) {
-	entries, err := os.ReadDir(dir)
+	entries, err := scanEntries(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return []Record{}, nil
-		}
-		return nil, fmt.Errorf("store: list %s: %w", dir, err)
+		return nil, err
 	}
 
 	records := make([]Record, 0, len(entries))
 	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		if idPattern.FindStringSubmatch(e.Name()) == nil {
-			continue
-		}
-		full := filepath.Join(dir, e.Name())
-		t, err := s.ReadTicket(full)
-		if err != nil {
-			return nil, fmt.Errorf("store: list: read %s: %w", e.Name(), err)
+		t, readErr := s.ReadTicket(e.path)
+		if readErr != nil {
+			return nil, fmt.Errorf("store: list: read %s: %w", filepath.Base(e.path), readErr)
 		}
 		records = append(records, Record{
 			Ticket:    t,
-			Path:      full,
+			Path:      e.path,
 			InArchive: inArchive,
 		})
 	}
