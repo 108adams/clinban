@@ -24,14 +24,14 @@ Ranking criteria (top → bottom):
 | # | Ticket | Why |
 |---|--------|-----|
 | 1 | **0021** Choose terminal UI foundation | ADR written, decision made (Charm stack); open questions must close before any TUI implementation ticket can be planned — blocks all phase-two work |
-| 2 | **0020** 'version' command | Zero-dependency CLI polish; can ride alongside 0021 |
+| ~~2~~ | ~~**0020** 'version' command~~ | ~~Zero-dependency CLI polish; can ride alongside 0021~~ |
 
 ## Tier 3 — Then
 
 | # | Ticket | Why |
 |---|--------|-----|
-| 1 | **0025** refactor: extract shared directory-scan helper in store/scan.go | Three near-identical loops in scan.go; consolidate before TUI work adds a fourth store consumer |
-| 2 | **0024** refactor: planResolve — use store.NextID, pre-sort IDs, single-pass group build | No user-visible impact; do after 0025 since both touch store internals |
+| ~~1~~ | ~~**0025** refactor: extract shared directory-scan helper in store/scan.go~~ | ~~Three near-identical loops in scan.go; consolidate before TUI work adds a fourth store consumer~~ |
+| ~~2~~ | ~~**0024** refactor: planResolve — use store.NextID, pre-sort IDs, single-pass group build~~ | ~~No user-visible impact; do after 0025 since both touch store internals~~ |
 
 ## Tier 4 — Later
 
