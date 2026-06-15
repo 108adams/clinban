@@ -1,10 +1,10 @@
 ---
 title: 'resolve: partial rename leaves inconsistent state on execution failure'
-status: backlog
+status: done
 type: bug
 tags: [cli, resolve, robustness]
 created: 2026-06-11T10:50:20.630521563+02:00
-updated: 2026-06-11T10:50:20.630521563+02:00
+updated: 2026-06-15T14:07:54.519189553+02:00
 ---
 
 ## Problem
