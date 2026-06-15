@@ -135,17 +135,52 @@ func (s *Store) BatchRenameWithinDir(ops []RenameOp) ([]string, error) {
 	}
 
 	// PHASE 2 — Remove: delete source files.
-	for _, op := range ops {
+	// Track which source indices have been successfully removed so that if a
+	// later removal fails we can restore those sources from their destination
+	// hard links before cleaning up the destination links.
+	removed := make([]int, 0, len(ops))
+	for k, op := range ops {
 		if err := removeFile(op.OldPath); err != nil {
-			// TASK-002: restore removed sources before cleanup, then remove all dest links.
+			// Phase-2 rollback (data-loss-safe):
+			//   Step 1 — RESTORE: re-link already-removed sources from their
+			//   destination hard links. This MUST happen before dest cleanup
+			//   because after os.Remove(oldPath) the destination is the only
+			//   surviving name for that inode; removing it without re-linking
+			//   first would permanently delete the file.
+			//   Step 2 — CLEANUP: remove all Phase-1 destination links.
+			// Both steps are best-effort: attempt all items even on partial failure.
+			var rollback []OpError
+
+			for _, j := range removed {
+				if restoreErr := linkFile(dests[j], ops[j].OldPath); restoreErr != nil {
+					rollback = append(rollback, OpError{
+						Kind: OpLink,
+						Base: filepath.Base(ops[j].OldPath),
+						Err:  restoreErr,
+					})
+				}
+			}
+
+			for _, dest := range linked {
+				if rmErr := removeFile(dest); rmErr != nil {
+					rollback = append(rollback, OpError{
+						Kind: OpRemove,
+						Base: filepath.Base(dest),
+						Err:  rmErr,
+					})
+				}
+			}
+
 			return nil, &BatchError{
 				Failed: OpError{
 					Kind: OpRemove,
-					Base: filepath.Base(op.OldPath),
+					Base: filepath.Base(ops[k].OldPath),
 					Err:  err,
 				},
+				Rollback: rollback,
 			}
 		}
+		removed = append(removed, k)
 	}
 
 	return dests, nil
