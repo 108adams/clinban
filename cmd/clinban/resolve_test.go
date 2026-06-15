@@ -200,6 +200,41 @@ func TestResolvePlannedDestinationCollisionLeavesFilesUnchanged(t *testing.T) {
 	}
 }
 
+// TestResolveBatchFailureIsAtomic is the integration smoke test for the
+// all-or-nothing guarantee: a filesystem failure during the batch leaves every
+// source untouched and creates no destination. chmod 0555 on the tickets
+// directory blocks the Phase-1 hard-link (creating a dest needs dir write), so
+// the batch aborts before mutating anything. (A same-dir rename cannot exercise
+// a Phase-2 Remove failure via chmod alone — Link and Remove need the same dir
+// write bit — so the Remove-failure rollback is covered by store unit tests.)
+func TestResolveBatchFailureIsAtomic(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses dir permissions")
+	}
+	bin := buildBinary(t)
+	root, ticketsDir, _ := setupWorkDir(t)
+	oldPath := writeTicket(t, ticketsDir, "0001-old.md", resolveTicketContent("2026-06-10T10:00:00Z", "Old"))
+	youngPath := writeTicket(t, ticketsDir, "0001-young.md", resolveTicketContent("2026-06-10T11:00:00Z", "Young"))
+
+	if err := os.Chmod(ticketsDir, 0o555); err != nil {
+		t.Fatalf("chmod tickets dir: %v", err)
+	}
+	// Restore write perm so t.TempDir cleanup can remove the directory.
+	t.Cleanup(func() { _ = os.Chmod(ticketsDir, 0o755) })
+
+	stdout, stderr, code := runResolve(t, bin, root)
+	if code != 1 {
+		t.Fatalf("resolve exit = %d, want 1; stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	// All-or-nothing: both originals intact, no renamed destination created.
+	assertExists(t, oldPath)
+	assertExists(t, youngPath)
+	assertMissing(t, filepath.Join(ticketsDir, "0002-young.md"))
+	if !strings.Contains(stderr, "resolve: link") {
+		t.Errorf("stderr = %q, want resolve: link failure", stderr)
+	}
+}
+
 func TestResolveUnrelatedMalformedTicketDoesNotBlock(t *testing.T) {
 	bin := buildBinary(t)
 	root, ticketsDir, _ := setupWorkDir(t)

@@ -3,7 +3,7 @@ title: CLI Reference
 kind: reference
 scope: cli
 summary: Documents Clinban commands, expected outputs, and exit-code conventions.
-updated: 2026-06-10
+updated: 2026-06-15
 links:
   - ticket-schema
   - configuration
@@ -173,10 +173,33 @@ For each rename, the command prints:
 renamed: tickets/0023-fix-parser.md -> tickets/0024-fix-parser.md
 ```
 
+### Atomic batch
+
+All renames in a run are applied as a single all-or-nothing batch. The whole
+plan is built first; if any rename then fails on disk, the batch aborts and
+restores the filesystem so no ticket is left half-renamed and no ticket is lost.
+Either every conflict is resolved or none is. See the storage page's
+[batch rename](storage.md#batch-rename-batchrenamewithindir) section for the
+two-phase algorithm and its rollback guarantee.
+
+On filesystem failure the command exits `1` and prints one of these error forms
+on stderr:
+
+```text
+resolve: link <file>: <os error>             # creating the new name failed
+resolve: remove <file>: <os error>           # deleting the old name failed
+resolve: rollback: remove <file>: <os error> # cleanup during rollback failed
+resolve: rollback: link <file>: <os error>   # restoring a file during rollback failed
+```
+
+The two `resolve: rollback:` forms appear only when the rollback itself could
+not fully complete; their presence means the filesystem may be left
+inconsistent and warrants manual inspection.
+
 Exit codes:
 
 - `0` — no conflicts exist or all conflicts were resolved
-- `1` — a conflicting ticket cannot be parsed, has no valid `created` timestamp, a destination already exists, or a filesystem rename fails
+- `1` — a conflicting ticket cannot be parsed, has no valid `created` timestamp, a destination already exists, or a filesystem rename fails (the batch is rolled back)
 
 ## `clinban lint [id]`
 

@@ -13,6 +13,12 @@ links:
 
 # Documentation Log
 
+## [2026-06-15] feature | resolve batch atomicity (ticket 0023)
+
+- Source: `tickets/0023-resolve-partial-rename-leaves-inconsistent.md`, `internal/store/move.go`, `cmd/clinban/resolve.go`
+- Updated: `docs/cli.md`, `docs/storage.md`, `docs/log.md`
+- Notes: Documented `BatchRenameWithinDir` two-phase link+remove with data-loss-safe Phase-2 restore-then-cleanup rollback and the `BatchError.Inconsistent` flag; added the four `resolve:` / `resolve: rollback:` error forms and all-or-nothing semantics to the resolve command reference.
+
 ## [2026-06-14] feature | version flag and release workflow (ticket 0020)
 
 - Source: `tickets/0020-version-command.md`, `.github/workflows/release.yml`

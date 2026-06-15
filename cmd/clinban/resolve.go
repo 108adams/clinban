@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -36,11 +37,6 @@ type resolveTicket struct {
 	created time.Time
 }
 
-type resolveRename struct {
-	oldPath string
-	newBase string
-}
-
 func runResolve(_ *cobra.Command, _ []string) error {
 	files, err := st.ManagedFiles()
 	if err != nil {
@@ -57,17 +53,36 @@ func runResolve(_ *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	for _, item := range plan {
-		newPath, err := st.RenameWithinDir(item.oldPath, item.newBase)
-		if err != nil {
-			return fmt.Errorf("resolve: rename %s: %w", filepath.Base(item.oldPath), err)
-		}
-		fmt.Fprintf(os.Stdout, "renamed: %s -> %s\n", displayPath(item.oldPath), displayPath(newPath))
+	newPaths, err := st.BatchRenameWithinDir(plan)
+	if err != nil {
+		return formatResolveError(err)
+	}
+
+	for i, op := range plan {
+		fmt.Fprintf(os.Stdout, "renamed: %s -> %s\n", displayPath(op.OldPath), displayPath(newPaths[i]))
 	}
 	return nil
 }
 
-func planResolve(files []store.ManagedFile) ([]resolveRename, error) {
+// formatResolveError translates a BatchRenameWithinDir error into the
+// CLI-facing message. The store layer never emits the "resolve:" prefix; the
+// CLI owns it. A *store.BatchError is rendered as the primary failure line plus
+// one "resolve: rollback:" line per residual rollback error. Any other error is
+// wrapped with a plain "resolve:" prefix.
+func formatResolveError(err error) error {
+	var be *store.BatchError
+	if !errors.As(err, &be) {
+		return fmt.Errorf("resolve: %w", err)
+	}
+
+	lines := []string{fmt.Sprintf("resolve: %s %s: %s", be.Failed.Kind, be.Failed.Base, be.Failed.Err)}
+	for _, re := range be.Rollback {
+		lines = append(lines, fmt.Sprintf("resolve: rollback: %s %s: %s", re.Kind, re.Base, re.Err))
+	}
+	return errors.New(strings.Join(lines, "\n"))
+}
+
+func planResolve(files []store.ManagedFile) ([]store.RenameOp, error) {
 	groups := map[string][]store.ManagedFile{}
 	for _, file := range files {
 		groups[file.ID] = append(groups[file.ID], file)
@@ -93,7 +108,7 @@ func planResolve(files []store.ManagedFile) ([]resolveRename, error) {
 	}
 	sort.Ints(dupNums)
 
-	var plan []resolveRename
+	var plan []store.RenameOp
 	for _, n := range dupNums {
 		id := dupMap[n]
 		tickets, err := readResolveGroup(groups[id])
@@ -120,9 +135,9 @@ func planResolve(files []store.ManagedFile) ([]resolveRename, error) {
 			} else if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("resolve: check destination %s: %w", displayPath(newPath), err)
 			}
-			plan = append(plan, resolveRename{
-				oldPath: item.file.Path,
-				newBase: newBase,
+			plan = append(plan, store.RenameOp{
+				OldPath: item.file.Path,
+				NewBase: newBase,
 			})
 		}
 	}

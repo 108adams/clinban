@@ -3,7 +3,7 @@ title: Storage
 kind: reference
 scope: storage
 summary: Describes Clinban filesystem layout, ticket discovery, ID scanning, writes, and archiving.
-updated: 2026-06-10
+updated: 2026-06-15
 links:
   - ticket-schema
   - configuration
@@ -50,6 +50,37 @@ ID uniqueness is enforced across active and archived tickets.
 Within each duplicate group, the oldest ticket by `created` timestamp keeps the original ID. Younger tickets are renamed to IDs above the current repository maximum. Active tickets remain in the active directory, archived tickets remain in the archive directory, and ticket contents are not rewritten.
 
 Resolution refuses planned destination collisions before applying renames. Each rename is performed within the same directory and refuses to overwrite an existing file.
+
+## Batch rename (`BatchRenameWithinDir`)
+
+All renames planned by `resolve` are applied through a single store call,
+`BatchRenameWithinDir`, which guarantees all-or-nothing semantics over the whole
+batch. Each rename stays within its source file's directory.
+
+The batch runs in two phases over hard links (`link` + `remove`, the same
+TOCTOU-safe idiom as single moves):
+
+1. **Phase 1 — Link.** Create every destination hard link. If any link fails,
+   the already-created destinations are removed and the batch aborts. No source
+   was touched, so the filesystem is unchanged.
+2. **Phase 2 — Remove.** Delete every source name. On success each ticket now
+   exists only under its new name.
+
+If a Phase-2 removal fails partway, rollback runs **restore-then-cleanup**:
+
+- **Restore first.** Re-link every already-removed source from its destination
+  hard link. After `remove(old)` succeeds, the destination is the inode's *only*
+  remaining name, so it must be re-linked back to the old path **before** the
+  destination is touched — otherwise removing the destination would permanently
+  delete the ticket.
+- **Cleanup second.** Remove all Phase-1 destination links.
+
+Both rollback steps are best-effort: every item is attempted even if an earlier
+one fails. Failures are collected on the returned `BatchError`. When rollback
+completes cleanly the batch leaves zero net change; when it does not,
+`BatchError.Inconsistent()` reports `true`, signalling the filesystem may need
+manual inspection. The CLI surfaces these as `resolve:` and `resolve: rollback:`
+error lines — see the [resolve command](cli.md#clinban-resolve).
 
 ## Writes
 
