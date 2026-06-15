@@ -1,12 +1,10 @@
 ---
-title: "Choose terminal UI foundation"
-status: "backlog"
-# states: backlog, in-progress, blocked, done
-type: "spike"
-# types: bug, task, feature, spike
-tags: ["tui", "adr", "discovery"]
-created: "2026-06-10T18:19:55+02:00"
-updated: "2026-06-10T18:19:55+02:00"
+title: Choose terminal UI foundation
+status: in-progress
+type: spike
+tags: [tui, adr, discovery]
+created: 2026-06-10T18:19:55+02:00
+updated: 2026-06-15T09:38:05.721840509+02:00
 ---
 
 # ADR: Terminal UI foundation
