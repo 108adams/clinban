@@ -1,7 +1,7 @@
 # Ticket Implementation Ranking
 
 Prepared: 2026-06-11
-Scope: 0014, 0020, 0021, 0023, 0024, 0025
+Scope: 0014, 0020, 0021, 0024, 0025
 
 Ranking criteria (top → bottom):
 1. Correctness bugs that corrupt or leave the ticket store in an unrecoverable state
@@ -12,12 +12,6 @@ Ranking criteria (top → bottom):
 6. Design stubs needing BA pass before they can be planned
 
 ---
-
-## Tier 1 — Fix now
-
-| # | Ticket | Why |
-|---|--------|-----|
-| 1 | **0023** resolve: partial rename leaves inconsistent state on execution failure | Correctness bug: mid-batch failure leaves store worse than before, unrecoverable without manual intervention |
 
 ## Tier 2 — Next batch
 
