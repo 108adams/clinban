@@ -59,3 +59,18 @@ func Lint(t *ticket.Ticket, filename string, allIDs []string) []LintError {
 	}
 	return result
 }
+
+// ValidateForCommit parses raw bytes, assigns id to the parsed ticket, then
+// runs Lint with filename and allIDs.
+//
+// Returns (nil, nil, parseErr) when ticket.Parse fails.
+// Returns (t, lintErrs, nil) otherwise — lintErrs is an empty (never nil)
+// slice when the ticket is valid.
+func ValidateForCommit(raw []byte, id, filename string, allIDs []string) (*ticket.Ticket, []LintError, error) {
+	t, err := ticket.Parse(raw)
+	if err != nil {
+		return nil, nil, err
+	}
+	t.ID = id
+	return t, Lint(t, filename, allIDs), nil
+}

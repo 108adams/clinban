@@ -50,35 +50,42 @@ func runRegister(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("register: read file: %w", err)
 	}
 
-	// Step 2 — parse as ticket; exit 1 on parse error.
-	t, err := ticket.Parse(content)
+	// Step 2 — preliminary parse to extract the title for filename construction.
+	// ticket.Parse is called again inside ValidateForCommit; this first call
+	// is necessary to build the canonical filename before lint can run.
+	preliminary, err := ticket.Parse(content)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 
-	// Step 3 — overwrite system-owned fields with fresh values.
-	now := time.Now()
+	// Step 3 — overwrite system-owned fields: assign the next system ID and
+	// compute the canonical filename from the (already-extracted) title.
 	nextID, err := st.NextID()
 	if err != nil {
 		return fmt.Errorf("register: next id: %w", err)
 	}
-	t.ID = fmt.Sprintf("%04d", nextID)
-	t.Created = now
-	t.Updated = now
+	id := fmt.Sprintf("%04d", nextID)
 
-	// Step 4 — collect all existing IDs and run lint.
+	sl := slug.Slugify(preliminary.Title)
+	finalPath := st.TicketPath(nextID, sl)
+	finalFilename := filepath.Base(finalPath)
+
+	// Step 4 — collect all existing IDs and run the parse+ID+lint kernel via
+	// ValidateForCommit. The kernel re-parses content, assigns the system id,
+	// and runs all lint rules against the canonical filename.
 	allIDs, err := st.AllIDs()
 	if err != nil {
 		return fmt.Errorf("register: collect ids: %w", err)
 	}
 
-	// Build the intended final filename for lint rule 4 (id matches filename).
-	sl := slug.Slugify(t.Title)
-	finalPath := st.TicketPath(nextID, sl)
-	finalFilename := filepath.Base(finalPath)
-
-	lintErrs := lint.Lint(t, finalFilename, allIDs)
+	t, lintErrs, parseErr := lint.ValidateForCommit(content, id, finalFilename, allIDs)
+	if parseErr != nil {
+		// parse already succeeded above; this branch is unreachable in
+		// practice but we handle it for correctness.
+		fmt.Fprintf(os.Stderr, "%v\n", parseErr)
+		os.Exit(1)
+	}
 	if len(lintErrs) > 0 {
 		for _, e := range lintErrs {
 			fmt.Fprintln(os.Stderr, e.String())
@@ -96,8 +103,10 @@ func runRegister(_ *cobra.Command, args []string) error {
 		os.Exit(1)
 	}
 
-	// Step 6 — write the ticket to its canonical location.
-	t.Updated = time.Now()
+	// Step 6 — overwrite system-owned timestamp fields and write atomically.
+	now := time.Now()
+	t.Created = now
+	t.Updated = now
 	if err := st.WriteTicket(t, finalPath); err != nil {
 		return fmt.Errorf("register: write ticket: %w", err)
 	}

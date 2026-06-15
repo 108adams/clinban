@@ -14,7 +14,6 @@ import (
 	"github.com/108adams/clinban/internal/editor"
 	"github.com/108adams/clinban/internal/lint"
 	"github.com/108adams/clinban/internal/store"
-	"github.com/108adams/clinban/internal/ticket"
 )
 
 var editCmd = &cobra.Command{
@@ -73,6 +72,10 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("edit: close temp: %w", err)
 	}
 
+	// Override id with the canonical 4-digit prefix from the managed filename;
+	// the CLI arg may be a partial match or alias.
+	id = filepath.Base(livePath)[:4]
+
 	for {
 		if err := editor.Open(tmpPath); err != nil {
 			return fmt.Errorf("edit: open editor: %w", err)
@@ -83,7 +86,12 @@ func runEdit(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("edit: read temp: %w", err)
 		}
 
-		t, parseErr := ticket.Parse(raw)
+		allIDs, err := st.AllIDs()
+		if err != nil {
+			return fmt.Errorf("edit: collect ids: %w", err)
+		}
+
+		t, lintErrs, parseErr := lint.ValidateForCommit(raw, id, filename, allIDs)
 		if parseErr != nil {
 			fmt.Fprintln(os.Stderr, parseErr.Error())
 			if !promptReopen() {
@@ -91,15 +99,6 @@ func runEdit(cmd *cobra.Command, args []string) error {
 			}
 			continue
 		}
-		// ID is derived from the managed filename, not from frontmatter.
-		t.ID = filepath.Base(livePath)[:4]
-
-		allIDs, err := st.AllIDs()
-		if err != nil {
-			return fmt.Errorf("edit: collect ids: %w", err)
-		}
-
-		lintErrs := lint.Lint(t, filename, allIDs)
 		if len(lintErrs) > 0 {
 			for _, e := range lintErrs {
 				fmt.Fprintln(os.Stderr, e.String())
