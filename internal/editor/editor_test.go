@@ -9,6 +9,103 @@ import (
 	"github.com/108adams/clinban/internal/editor"
 )
 
+const testFilePath = "/tmp/test-ticket.md"
+
+// TestCommand_Nano verifies Command with EDITOR=nano returns correct name, path last, stdio nil.
+func TestCommand_Nano(t *testing.T) {
+	t.Setenv("EDITOR", "nano")
+
+	cmd, err := editor.Command(testFilePath)
+	if err != nil {
+		t.Fatalf("Command returned unexpected error: %v", err)
+	}
+	if cmd == nil {
+		t.Fatal("Command returned nil cmd")
+	}
+	if filepath.Base(cmd.Path) != "nano" {
+		t.Errorf("cmd.Path base = %q, want %q", filepath.Base(cmd.Path), "nano")
+	}
+	if len(cmd.Args) == 0 {
+		t.Fatal("cmd.Args is empty")
+	}
+	if cmd.Args[len(cmd.Args)-1] != testFilePath {
+		t.Errorf("last arg = %q, want %q", cmd.Args[len(cmd.Args)-1], testFilePath)
+	}
+	if cmd.Stdin != nil {
+		t.Errorf("cmd.Stdin = %v, want nil", cmd.Stdin)
+	}
+	if cmd.Stdout != nil {
+		t.Errorf("cmd.Stdout = %v, want nil", cmd.Stdout)
+	}
+	if cmd.Stderr != nil {
+		t.Errorf("cmd.Stderr = %v, want nil", cmd.Stderr)
+	}
+}
+
+// TestCommand_CodeWait verifies --wait is appended for VS Code and not duplicated.
+func TestCommand_CodeWait(t *testing.T) {
+	t.Run("wait appended", func(t *testing.T) {
+		t.Setenv("EDITOR", "code")
+
+		cmd, err := editor.Command(testFilePath)
+		if err != nil {
+			t.Fatalf("Command returned unexpected error: %v", err)
+		}
+
+		waitCount := 0
+		for _, arg := range cmd.Args {
+			if arg == "--wait" {
+				waitCount++
+			}
+		}
+		if waitCount != 1 {
+			t.Errorf("--wait count = %d, want 1; args: %v", waitCount, cmd.Args)
+		}
+		if cmd.Args[len(cmd.Args)-1] != testFilePath {
+			t.Errorf("last arg = %q, want path %q", cmd.Args[len(cmd.Args)-1], testFilePath)
+		}
+	})
+
+	t.Run("wait not duplicated", func(t *testing.T) {
+		t.Setenv("EDITOR", "code --wait")
+
+		cmd, err := editor.Command(testFilePath)
+		if err != nil {
+			t.Fatalf("Command returned unexpected error: %v", err)
+		}
+
+		waitCount := 0
+		for _, arg := range cmd.Args {
+			if arg == "--wait" {
+				waitCount++
+			}
+		}
+		if waitCount != 1 {
+			t.Errorf("--wait count = %d, want 1 (no duplication); args: %v", waitCount, cmd.Args)
+		}
+	})
+}
+
+// TestCommand_EmptyEditorFallback verifies empty EDITOR falls back to vi.
+func TestCommand_EmptyEditorFallback(t *testing.T) {
+	t.Setenv("EDITOR", "")
+	// Use a temp dir with a fake vi so exec.LookPath succeeds.
+	dir := t.TempDir()
+	vi := filepath.Join(dir, "vi")
+	if err := os.WriteFile(vi, []byte("#!/bin/sh\n"), 0o700); err != nil {
+		t.Fatalf("write vi stub: %v", err)
+	}
+	t.Setenv("PATH", dir)
+
+	cmd, err := editor.Command(testFilePath)
+	if err != nil {
+		t.Fatalf("Command returned unexpected error: %v", err)
+	}
+	if filepath.Base(cmd.Path) != "vi" {
+		t.Errorf("cmd.Path base = %q, want %q", filepath.Base(cmd.Path), "vi")
+	}
+}
+
 func TestEditorSuccess(t *testing.T) {
 	t.Setenv("EDITOR", "/bin/true")
 	tmp := t.TempDir()
