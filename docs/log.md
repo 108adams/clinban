@@ -156,3 +156,9 @@ links:
 - Source: `internal/tui/*`, `cmd/clinban/board.go`
 - Updated: `docs/clinban-board.md` (new), `docs/cli.md`, `docs/index.md`, `docs/log.md`
 - Notes: Added the interactive two-pane board TUI on the Charm stack (Bubble Tea/Bubbles/Lip Gloss v2, `charm.land/...` import paths). First slice is the scaffold: active-ticket list in board order, raw-source preview placeholder, non-mutating keymap (`j`/`k`, `r` reload, `?` help, quit), resize handling, and a whole-board error state. Editing, status advance, and preview scrolling land in T5–T7 and will be documented as they arrive. `cmd/clinban/schema.md` checked — unchanged (board adds no ticket-frontmatter or generated-SCHEMA guidance).
+
+## [2026-06-16] feature | board preview pane (ticket 0021, T5)
+
+- Source: `internal/tui/commands.go`, `internal/tui/messages.go`, `internal/tui/model.go`, `internal/tui/keys.go`
+- Updated: `docs/clinban-board.md`, `docs/log.md`
+- Notes: The right pane now previews the selected ticket's raw file bytes (`os.ReadFile` on `Record.Path`, never a re-marshaled Ticket — ADR-4). Selection changes re-load the preview; `ctrl+d`/`ctrl+u` scroll it. Added a test guarding that non-canonical frontmatter is shown verbatim, not normalized.

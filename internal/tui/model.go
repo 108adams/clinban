@@ -106,7 +106,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			items[i] = ticketItem{record: r}
 		}
 		cmd := m.list.SetItems(items)
+		if path, ok := m.selectedPath(); ok {
+			return m, tea.Batch(cmd, loadPreview(path))
+		}
 		return m, cmd
+
+	case previewLoadedMsg:
+		if msg.Err != nil {
+			m.status = "preview: " + msg.Err.Error()
+			return m, nil
+		}
+		m.preview.SetContent(string(msg.Content))
+		return m, nil
 
 	case tea.KeyPressMsg:
 		switch {
@@ -121,13 +132,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case isReload(msg, m.keys):
 			return m, loadTickets(m.st)
 
-		case isUp(msg, m.keys):
-			m.list.CursorUp()
+		case isScrollDown(msg, m.keys):
+			m.preview.HalfPageDown()
 			return m, nil
 
-		case isDown(msg, m.keys):
-			m.list.CursorDown()
+		case isScrollUp(msg, m.keys):
+			m.preview.HalfPageUp()
 			return m, nil
+
+		case isUp(msg, m.keys):
+			before := m.list.Index()
+			m.list.CursorUp()
+			return m.previewOnChange(before)
+
+		case isDown(msg, m.keys):
+			before := m.list.Index()
+			m.list.CursorDown()
+			return m.previewOnChange(before)
 		}
 	}
 
@@ -228,11 +249,34 @@ func (m Model) renderContent() string {
 // Key-match helpers (keep Update readable). key.Matches handles the binding's
 // Enabled() check and key-set comparison via the message's String().
 
-func isQuit(msg tea.KeyPressMsg, km keyMap) bool   { return key.Matches(msg, km.Quit) }
-func isHelp(msg tea.KeyPressMsg, km keyMap) bool   { return key.Matches(msg, km.Help) }
-func isReload(msg tea.KeyPressMsg, km keyMap) bool { return key.Matches(msg, km.Reload) }
-func isUp(msg tea.KeyPressMsg, km keyMap) bool     { return key.Matches(msg, km.Up) }
-func isDown(msg tea.KeyPressMsg, km keyMap) bool   { return key.Matches(msg, km.Down) }
+func isQuit(msg tea.KeyPressMsg, km keyMap) bool       { return key.Matches(msg, km.Quit) }
+func isHelp(msg tea.KeyPressMsg, km keyMap) bool       { return key.Matches(msg, km.Help) }
+func isReload(msg tea.KeyPressMsg, km keyMap) bool     { return key.Matches(msg, km.Reload) }
+func isUp(msg tea.KeyPressMsg, km keyMap) bool         { return key.Matches(msg, km.Up) }
+func isDown(msg tea.KeyPressMsg, km keyMap) bool       { return key.Matches(msg, km.Down) }
+func isScrollDown(msg tea.KeyPressMsg, km keyMap) bool { return key.Matches(msg, km.ScrollDown) }
+func isScrollUp(msg tea.KeyPressMsg, km keyMap) bool   { return key.Matches(msg, km.ScrollUp) }
+
+// selectedPath returns the file path of the currently selected record.
+func (m Model) selectedPath() (string, bool) {
+	i := m.list.Index()
+	if i < 0 || i >= len(m.records) {
+		return "", false
+	}
+	return m.records[i].Path, true
+}
+
+// previewOnChange issues a preview load only when the selection actually moved
+// from idxBefore, avoiding a redundant re-read when navigation clamps.
+func (m Model) previewOnChange(idxBefore int) (tea.Model, tea.Cmd) {
+	if m.list.Index() == idxBefore {
+		return m, nil
+	}
+	if path, ok := m.selectedPath(); ok {
+		return m, loadPreview(path)
+	}
+	return m, nil
+}
 
 // padLines ensures the string has exactly n lines by appending blank lines.
 func padLines(s string, n int) string {

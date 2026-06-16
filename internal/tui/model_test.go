@@ -2,8 +2,10 @@ package tui
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -193,6 +195,99 @@ func TestUpdate_WindowSize_StoresDims_ViewNoPanic(t *testing.T) {
 		}
 		// Must not panic at any size, including degenerate ones.
 		_ = m.View()
+	}
+}
+
+func TestUpdate_PreviewLoaded_SetsExactContent(t *testing.T) {
+	t.Parallel()
+	m := New(nil)
+	raw := []byte("---\nstatus: backlog\n---\n# raw body\n")
+	m, _ = update(t, m, previewLoadedMsg{Content: raw})
+	if got := m.preview.GetContent(); got != string(raw) {
+		t.Errorf("preview content = %q, want %q", got, raw)
+	}
+}
+
+func TestUpdate_SelectionChange_IssuesPreviewForNewPath(t *testing.T) {
+	t.Parallel()
+	m := New(nil)
+	m, _ = update(t, m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m, _ = update(t, m, ticketsLoadedMsg{Records: []store.Record{
+		rec("0001", ticket.StatusInProgress),
+		rec("0002", ticket.StatusInProgress),
+	}})
+
+	_, cmd := update(t, m, keyPress("j")) // selection 0001 -> 0002
+	if cmd == nil {
+		t.Fatal("selection change produced no cmd")
+	}
+	msg := cmd()
+	pl, ok := msg.(previewLoadedMsg)
+	if !ok {
+		t.Fatalf("selection-change cmd returned %T, want previewLoadedMsg", msg)
+	}
+	if pl.Path != "0002-x.md" {
+		t.Errorf("preview path = %q, want %q", pl.Path, "0002-x.md")
+	}
+}
+
+// TestLoadPreview_ReturnsRawFileBytes guards ADR-4: the preview is the original
+// file bytes, never a re-marshaled Ticket.
+func TestLoadPreview_ReturnsRawFileBytes(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	// Non-canonical frontmatter (status first, not title) + a blank line, so the
+	// raw bytes differ from ticket.Marshal output.
+	raw := []byte("---\nstatus: backlog\ntype: task\ntitle: \"Weird order\"\ntags: []\n" +
+		"created: 2026-01-01T00:00:00Z\nupdated: 2026-01-01T00:00:00Z\n---\n\n# Body\n\nverbatim\n")
+	path := filepath.Join(dir, "0009-weird.md")
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	msg, ok := loadPreview(path)().(previewLoadedMsg)
+	if !ok {
+		t.Fatalf("loadPreview returned %T, want previewLoadedMsg", msg)
+	}
+	if msg.Err != nil {
+		t.Fatalf("loadPreview err = %v", msg.Err)
+	}
+	if string(msg.Content) != string(raw) {
+		t.Errorf("preview not verbatim:\n got: %q\nwant: %q", msg.Content, raw)
+	}
+	// Sanity: confirm the fixture really is non-canonical, so the verbatim
+	// assertion above genuinely exercises the no-remarshal guarantee.
+	tk, err := ticket.Parse(raw)
+	if err != nil {
+		t.Fatalf("parse fixture: %v", err)
+	}
+	if marshaled, err := ticket.Marshal(tk); err == nil && string(marshaled) == string(raw) {
+		t.Fatal("fixture is canonical; cannot prove non-remarshaling — adjust frontmatter")
+	}
+}
+
+func TestUpdate_ScrollKeys_MovePreview(t *testing.T) {
+	t.Parallel()
+	m := New(nil)
+	m, _ = update(t, m, tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	var sb strings.Builder
+	for i := range 200 {
+		fmt.Fprintf(&sb, "line %d\n", i)
+	}
+	m, _ = update(t, m, previewLoadedMsg{Content: []byte(sb.String())})
+	if !m.preview.AtTop() {
+		t.Fatal("preview should start at top")
+	}
+
+	m, _ = update(t, m, tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}) // ctrl+d
+	down := m.preview.YOffset()
+	if down == 0 {
+		t.Fatal("ctrl+d did not scroll the preview down")
+	}
+	m, _ = update(t, m, tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}) // ctrl+u
+	if m.preview.YOffset() >= down {
+		t.Errorf("ctrl+u did not scroll up: YOffset %d >= %d", m.preview.YOffset(), down)
 	}
 }
 

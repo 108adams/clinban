@@ -10,3 +10,11 @@ type ticketsLoadedMsg struct {
 	Records []store.Record
 	Err     error
 }
+
+// previewLoadedMsg is sent by loadPreview after reading a ticket's file.
+// Content is the exact on-disk bytes — never a re-marshaled Ticket (ADR-4).
+type previewLoadedMsg struct {
+	Path    string
+	Content []byte
+	Err     error
+}

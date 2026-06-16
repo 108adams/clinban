@@ -33,6 +33,7 @@ becomes a second source of ticket truth.
 |-----|--------|
 | `j` / `↓` | move selection down |
 | `k` / `↑` | move selection up |
+| `ctrl+d` / `ctrl+u` | scroll the preview down / up |
 | `r` | reload the board from disk |
 | `?` | toggle the help bar (short ↔ full) |
 | `q` / `ctrl+c` / `esc` | quit |
@@ -42,6 +43,9 @@ becomes a second source of ticket truth.
 - Tickets are loaded through the store's active-ticket scan. If any file fails
   to load or parse, the board shows an **error state** rather than a partial
   list — it never renders half a board.
+- The right pane shows the selected ticket's raw file bytes verbatim (never a
+  re-rendered or re-marshaled view); `ctrl+d` / `ctrl+u` scroll it. Changing the
+  selection re-loads the preview for the newly selected ticket.
 - `r` re-reads the board from disk; navigation clamps at the first and last
   ticket.
 - Terminal resize is handled; the panes re-fit to the new size.
@@ -53,8 +57,8 @@ This is the terminal-UI **foundation**. The first release:
 - shows **active tickets only** (archived tickets are not listed);
 - renders the preview as **raw Markdown source** — the exact file bytes, never
   re-rendered or re-marshaled;
-- is non-mutating — editing, status advance, and preview scrolling are layered
-  on in follow-up work and documented here as they land.
+- is non-mutating — editing and status advance are layered on in follow-up
+  work and documented here as they land.
 
 See [Architecture](architecture.md) for the package boundary and the decision
 record behind the Charm stack.
