@@ -3,12 +3,13 @@ title: Documentation Index
 kind: overview
 scope: docs
 summary: Maps the maintained Clinban documentation wiki.
-updated: 2026-05-19
+updated: 2026-06-16
 links:
   - schema
   - log
   - product
   - cli
+  - clinban-board
   - ticket-schema
   - architecture
   - development
@@ -31,6 +32,7 @@ This index is the entry point for the maintained Clinban wiki.
 ## Reference
 
 - [CLI Reference](cli.md) - Documents commands, expected outputs, and exit-code conventions.
+- [Board TUI](clinban-board.md) - Documents the interactive two-pane board launched by `clinban board`.
 - [Ticket Schema](ticket-schema.md) - Defines ticket files, YAML frontmatter fields, filename convention, and ownership rules.
 - [Configuration](configuration.md) - Describes `.clinban`, root discovery, and ticket directory defaults.
 - [Validation](validation.md) - Explains parse errors, lint rules, and workflow transition enforcement.

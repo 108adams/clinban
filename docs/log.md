@@ -3,7 +3,7 @@ title: Documentation Log
 kind: log
 scope: docs
 summary: Records chronological maintenance activity for the Clinban documentation wiki.
-updated: 2026-06-14
+updated: 2026-06-16
 links:
   - index
   - schema
@@ -150,3 +150,9 @@ links:
 - Source: migration commit `6a0cd17`
 - Updated: `docs/development.md`, `docs/log.md`
 - Notes: Added CI section documenting GitHub Actions workflow; no other wiki pages had stale GitLab or old module path references.
+
+## [2026-06-16] feature | clinban board TUI scaffold (ticket 0021, T4)
+
+- Source: `internal/tui/*`, `cmd/clinban/board.go`
+- Updated: `docs/clinban-board.md` (new), `docs/cli.md`, `docs/index.md`, `docs/log.md`
+- Notes: Added the interactive two-pane board TUI on the Charm stack (Bubble Tea/Bubbles/Lip Gloss v2, `charm.land/...` import paths). First slice is the scaffold: active-ticket list in board order, raw-source preview placeholder, non-mutating keymap (`j`/`k`, `r` reload, `?` help, quit), resize handling, and a whole-board error state. Editing, status advance, and preview scrolling land in T5–T7 and will be documented as they arrive. `cmd/clinban/schema.md` checked — unchanged (board adds no ticket-frontmatter or generated-SCHEMA guidance).
