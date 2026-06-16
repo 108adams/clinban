@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -12,6 +14,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/108adams/clinban/internal/board"
+	"github.com/108adams/clinban/internal/lint"
 	"github.com/108adams/clinban/internal/store"
 )
 
@@ -137,6 +140,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.withReload()
 		}
 
+	case editBeginFailedMsg:
+		m.status = "edit: " + msg.Err.Error()
+		return m, nil
+
+	case editReadyMsg:
+		m.scratch = msg.Scratch
+		m.editLive = msg.LivePath
+		return m, tea.ExecProcess(msg.Cmd, func(err error) tea.Msg {
+			return editFinishedMsg{Err: err}
+		})
+
+	case editFinishedMsg:
+		if msg.Err != nil {
+			m = m.removeScratch()
+			m.status = "edit: " + msg.Err.Error()
+			return m, nil
+		}
+		return m, commitEdit(m.st, m.scratch, m.editLive, filepath.Base(m.editLive))
+
+	case editCommittedMsg:
+		m = m.removeScratch()
+		switch {
+		case msg.ParseOrIOErr != nil:
+			m.status = "edit rejected: " + msg.ParseOrIOErr.Error()
+			return m, nil
+		case len(msg.LintErrs) > 0:
+			m.status = "lint: " + lintSummary(msg.LintErrs)
+			return m, nil
+		default:
+			m.status = ""
+			return m.withReload()
+		}
+
 	case tea.KeyPressMsg:
 		switch {
 		case isQuit(msg, m.keys):
@@ -149,6 +185,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case isReload(msg, m.keys):
 			return m.withReload()
+
+		case isEdit(msg, m.keys):
+			if id, ok := m.selectedID(); ok {
+				return m, beginEdit(m.st, id)
+			}
+			return m, nil
 
 		case isAdvance(msg, m.keys):
 			if id, ok := m.selectedID(); ok {
@@ -280,7 +322,28 @@ func isUp(msg tea.KeyPressMsg, km keyMap) bool         { return key.Matches(msg,
 func isDown(msg tea.KeyPressMsg, km keyMap) bool       { return key.Matches(msg, km.Down) }
 func isScrollDown(msg tea.KeyPressMsg, km keyMap) bool { return key.Matches(msg, km.ScrollDown) }
 func isScrollUp(msg tea.KeyPressMsg, km keyMap) bool   { return key.Matches(msg, km.ScrollUp) }
+func isEdit(msg tea.KeyPressMsg, km keyMap) bool       { return key.Matches(msg, km.Edit) }
 func isAdvance(msg tea.KeyPressMsg, km keyMap) bool    { return key.Matches(msg, km.Advance) }
+
+// removeScratch deletes the in-flight edit scratch file (best-effort) and
+// clears the edit state. Called on every terminal edit outcome.
+func (m Model) removeScratch() Model {
+	if m.scratch != "" {
+		_ = os.Remove(m.scratch)
+	}
+	m.scratch = ""
+	m.editLive = ""
+	return m
+}
+
+// lintSummary renders lint errors into a single status-line string.
+func lintSummary(errs []lint.LintError) string {
+	parts := make([]string, len(errs))
+	for i, e := range errs {
+		parts[i] = e.String()
+	}
+	return strings.Join(parts, "; ")
+}
 
 // selectedPath returns the file path of the currently selected record.
 func (m Model) selectedPath() (string, bool) {

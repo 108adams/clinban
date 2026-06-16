@@ -9,6 +9,7 @@ type keyMap struct {
 	Down       key.Binding
 	ScrollDown key.Binding
 	ScrollUp   key.Binding
+	Edit       key.Binding
 	Advance    key.Binding
 	Reload     key.Binding
 	Help       key.Binding
@@ -34,6 +35,10 @@ func defaultKeyMap() keyMap {
 			key.WithKeys("ctrl+u"),
 			key.WithHelp("ctrl+u", "scroll preview up"),
 		),
+		Edit: key.NewBinding(
+			key.WithKeys("e"),
+			key.WithHelp("e", "edit in $EDITOR"),
+		),
 		Advance: key.NewBinding(
 			key.WithKeys(">"),
 			key.WithHelp(">", "advance status"),
@@ -55,7 +60,7 @@ func defaultKeyMap() keyMap {
 
 // ShortHelp returns the short help bindings (for the collapsed help bar).
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.ScrollDown, k.ScrollUp, k.Advance, k.Reload, k.Help, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.ScrollDown, k.ScrollUp, k.Edit, k.Advance, k.Reload, k.Help, k.Quit}
 }
 
 // FullHelp returns the full help bindings grouped by column.
@@ -63,6 +68,6 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down},
 		{k.ScrollDown, k.ScrollUp},
-		{k.Advance, k.Reload, k.Help, k.Quit},
+		{k.Edit, k.Advance, k.Reload, k.Help, k.Quit},
 	}
 }

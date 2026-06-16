@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/108adams/clinban/internal/config"
+	"github.com/108adams/clinban/internal/lint"
 	"github.com/108adams/clinban/internal/store"
 	"github.com/108adams/clinban/internal/ticket"
 )
@@ -112,6 +113,39 @@ func readStatus(t *testing.T, st *store.Store, id string) (ticket.Status, time.T
 		t.Fatalf("ReadTicket %s: %v", id, err)
 	}
 	return tk.Status, tk.Updated
+}
+
+// writeScratch writes content to a dot-prefixed scratch file in dir.
+func writeScratch(t *testing.T, dir, content string) string {
+	t.Helper()
+	p := filepath.Join(dir, ".clinban-edit-test.md")
+	if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+		t.Fatalf("write scratch: %v", err)
+	}
+	return p
+}
+
+// validTicketBytes returns canonical, lint-clean ticket bytes with the title.
+func validTicketBytes(t *testing.T, title string) []byte {
+	t.Helper()
+	tk := &ticket.Ticket{
+		Status: ticket.StatusBacklog, Type: ticket.TypeTask, Title: title,
+		Tags: []string{}, Created: fixturePast, Updated: fixturePast,
+	}
+	b, err := ticket.Marshal(tk)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	return b
+}
+
+// noScratchLeft asserts the tickets dir holds no .clinban-edit scratch files.
+func noScratchLeft(t *testing.T, dir string) {
+	t.Helper()
+	matches, _ := filepath.Glob(filepath.Join(dir, ".clinban-edit-*"))
+	if len(matches) != 0 {
+		t.Errorf("scratch files left behind: %v", matches)
+	}
 }
 
 // ---- tests ----
@@ -497,6 +531,284 @@ func TestApplyPendingSelection_MissingIDClamps(t *testing.T) {
 	}
 	if m.pendingSelectID != "" {
 		t.Errorf("pendingSelectID = %q, want cleared", m.pendingSelectID)
+	}
+}
+
+func TestBeginEdit_Success(t *testing.T) {
+	t.Setenv("EDITOR", "vi")
+	st, dir := newStoreWith(t, tspec{"0001", ticket.StatusBacklog})
+	livePath, _, _ := st.FindByID("0001")
+	liveBytes, _ := os.ReadFile(livePath)
+
+	msg, ok := beginEdit(st, "0001")().(editReadyMsg)
+	if !ok {
+		t.Fatalf("beginEdit returned %T, want editReadyMsg", msg)
+	}
+	if msg.LivePath != livePath {
+		t.Errorf("LivePath = %q, want fresh-resolved %q", msg.LivePath, livePath)
+	}
+	if filepath.Dir(msg.Scratch) != dir {
+		t.Errorf("scratch dir = %q, want same dir as live %q", filepath.Dir(msg.Scratch), dir)
+	}
+	gotScratch, err := os.ReadFile(msg.Scratch)
+	if err != nil {
+		t.Fatalf("read scratch: %v", err)
+	}
+	if string(gotScratch) != string(liveBytes) {
+		t.Errorf("scratch content does not match live bytes")
+	}
+	if msg.Cmd == nil {
+		t.Error("editReadyMsg.Cmd is nil")
+	}
+}
+
+func TestBeginEdit_EmptyEditorRemovesScratch(t *testing.T) {
+	t.Setenv("EDITOR", " ") // whitespace-only -> editor.Command errors
+	st, dir := newStoreWith(t, tspec{"0001", ticket.StatusBacklog})
+
+	msg, ok := beginEdit(st, "0001")().(editBeginFailedMsg)
+	if !ok {
+		t.Fatalf("beginEdit returned %T, want editBeginFailedMsg", msg)
+	}
+	if msg.Err == nil {
+		t.Error("editBeginFailedMsg.Err is nil")
+	}
+	noScratchLeft(t, dir) // scratch created then removed
+}
+
+func TestBeginEdit_FindErrorNoScratch(t *testing.T) {
+	t.Parallel()
+	st, dir := newStoreWith(t, tspec{"0001", ticket.StatusBacklog})
+	msg, ok := beginEdit(st, "9999")().(editBeginFailedMsg) // no such ticket
+	if !ok {
+		t.Fatalf("beginEdit returned %T, want editBeginFailedMsg", msg)
+	}
+	noScratchLeft(t, dir)
+}
+
+func TestUpdate_EditKey_IssuesBeginEdit(t *testing.T) {
+	t.Setenv("EDITOR", "vi")
+	st, _ := newStoreWith(t, tspec{"0001", ticket.StatusBacklog})
+	m := New(st)
+	m, _ = update(t, m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m, _ = update(t, m, loadTickets(st)().(ticketsLoadedMsg))
+
+	_, cmd := update(t, m, keyPress("e"))
+	if cmd == nil {
+		t.Fatal("e produced no cmd")
+	}
+	if _, ok := cmd().(editReadyMsg); !ok {
+		t.Errorf("e cmd returned %T, want editReadyMsg", cmd())
+	}
+}
+
+func TestCommitEdit_Valid(t *testing.T) {
+	t.Parallel()
+	st, dir := newStoreWith(t, tspec{"0001", ticket.StatusBacklog})
+	livePath, _, _ := st.FindByID("0001")
+	scratch := writeScratch(t, dir, string(validTicketBytes(t, "Edited title")))
+
+	msg, ok := commitEdit(st, scratch, livePath, filepath.Base(livePath))().(editCommittedMsg)
+	if !ok {
+		t.Fatalf("commitEdit returned %T, want editCommittedMsg", msg)
+	}
+	if msg.ParseOrIOErr != nil || len(msg.LintErrs) != 0 {
+		t.Fatalf("commitEdit = %+v, want success", msg)
+	}
+	tk, err := st.ReadTicket(livePath)
+	if err != nil {
+		t.Fatalf("read live: %v", err)
+	}
+	if tk.Title != "Edited title" {
+		t.Errorf("live title = %q, want %q", tk.Title, "Edited title")
+	}
+	if !tk.Updated.After(fixturePast) {
+		t.Errorf("Updated = %v, want refreshed", tk.Updated)
+	}
+}
+
+func TestCommitEdit_ScratchReadError(t *testing.T) {
+	t.Parallel()
+	st, dir := newStoreWith(t, tspec{"0001", ticket.StatusBacklog})
+	livePath, _, _ := st.FindByID("0001")
+	before, _ := os.ReadFile(livePath)
+
+	missing := filepath.Join(dir, ".clinban-edit-gone.md") // never created
+	msg := commitEdit(st, missing, livePath, filepath.Base(livePath))().(editCommittedMsg)
+	if msg.ParseOrIOErr == nil {
+		t.Fatalf("commitEdit = %+v, want ParseOrIOErr on scratch read failure", msg)
+	}
+	after, _ := os.ReadFile(livePath)
+	if string(after) != string(before) {
+		t.Error("live file changed despite scratch read error")
+	}
+}
+
+func TestCommitEdit_AllIDsScanError(t *testing.T) {
+	t.Parallel()
+	if os.Geteuid() == 0 {
+		t.Skip("permission errors do not apply to root")
+	}
+	st, dir := newStoreWith(t, tspec{"0001", ticket.StatusBacklog})
+	livePath, _, _ := st.FindByID("0001")
+	before, _ := os.ReadFile(livePath)
+	scratch := writeScratch(t, dir, string(validTicketBytes(t, "Edited title")))
+
+	// Make the archive dir unreadable so st.AllIDs() fails after the scratch read.
+	archive := filepath.Join(dir, "archive")
+	if err := os.Chmod(archive, 0o000); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(archive, 0o750) })
+
+	msg := commitEdit(st, scratch, livePath, filepath.Base(livePath))().(editCommittedMsg)
+	if msg.ParseOrIOErr == nil {
+		t.Fatalf("commitEdit = %+v, want ParseOrIOErr on AllIDs scan failure", msg)
+	}
+	if len(msg.LintErrs) != 0 {
+		t.Error("LintErrs set; ValidateForCommit should not have been reached")
+	}
+	_ = os.Chmod(archive, 0o750)
+	after, _ := os.ReadFile(livePath)
+	if string(after) != string(before) {
+		t.Error("live file changed despite AllIDs scan error")
+	}
+}
+
+func TestCommitEdit_ParseError(t *testing.T) {
+	t.Parallel()
+	st, dir := newStoreWith(t, tspec{"0001", ticket.StatusBacklog})
+	livePath, _, _ := st.FindByID("0001")
+	before, _ := os.ReadFile(livePath)
+	scratch := writeScratch(t, dir, "this is not a ticket — no frontmatter\n")
+
+	msg := commitEdit(st, scratch, livePath, filepath.Base(livePath))().(editCommittedMsg)
+	if msg.ParseOrIOErr == nil {
+		t.Fatalf("commitEdit = %+v, want ParseOrIOErr on parse failure", msg)
+	}
+	after, _ := os.ReadFile(livePath)
+	if string(after) != string(before) {
+		t.Error("live file changed despite parse error")
+	}
+}
+
+func TestCommitEdit_LintViolation(t *testing.T) {
+	t.Parallel()
+	st, dir := newStoreWith(t, tspec{"0001", ticket.StatusBacklog})
+	livePath, _, _ := st.FindByID("0001")
+	before, _ := os.ReadFile(livePath)
+	// Parses fine, but "wip" is not a valid status -> lint violation.
+	bad := "---\ntitle: \"X\"\nstatus: wip\ntype: task\ntags: []\n" +
+		"created: 2025-01-01T00:00:00Z\nupdated: 2025-01-01T00:00:00Z\n---\n# body\n"
+	scratch := writeScratch(t, dir, bad)
+
+	msg := commitEdit(st, scratch, livePath, filepath.Base(livePath))().(editCommittedMsg)
+	if len(msg.LintErrs) == 0 {
+		t.Fatalf("commitEdit = %+v, want LintErrs on lint violation", msg)
+	}
+	if msg.ParseOrIOErr != nil {
+		t.Errorf("ParseOrIOErr = %v, want nil for a lint violation", msg.ParseOrIOErr)
+	}
+	after, _ := os.ReadFile(livePath)
+	if string(after) != string(before) {
+		t.Error("live file changed despite lint violation")
+	}
+}
+
+func TestCommitEdit_WriteError(t *testing.T) {
+	t.Parallel()
+	if os.Geteuid() == 0 {
+		t.Skip("permission errors do not apply to root")
+	}
+	st, dir := newStoreWith(t, tspec{"0001", ticket.StatusBacklog})
+	livePath, _, _ := st.FindByID("0001")
+	before, _ := os.ReadFile(livePath)
+	scratch := writeScratch(t, dir, string(validTicketBytes(t, "Edited title")))
+
+	// Read-only tickets dir: scratch read + AllIDs succeed, WriteTicket fails.
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	msg := commitEdit(st, scratch, livePath, filepath.Base(livePath))().(editCommittedMsg)
+	if msg.ParseOrIOErr == nil {
+		t.Fatalf("commitEdit = %+v, want ParseOrIOErr on write failure", msg)
+	}
+	_ = os.Chmod(dir, 0o700)
+	after, _ := os.ReadFile(livePath)
+	if string(after) != string(before) {
+		t.Error("live file changed despite write error")
+	}
+}
+
+func TestUpdate_EditCommitted_RemovesScratchAndRoutes(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name       string
+		msg        editCommittedMsg
+		wantReload bool
+	}{
+		{"success", editCommittedMsg{}, true},
+		{"parseOrIO", editCommittedMsg{ParseOrIOErr: errors.New("boom")}, false},
+		{"lint", editCommittedMsg{LintErrs: []lint.LintError{{}}}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			scratch := writeScratch(t, dir, "x")
+			m := New(nil)
+			m.scratch = scratch
+			m.editLive = filepath.Join(dir, "0001-t.md")
+
+			m2, cmd := update(t, m, tc.msg)
+			if m2.scratch != "" || m2.editLive != "" {
+				t.Error("edit state not cleared after editCommittedMsg")
+			}
+			noScratchLeft(t, dir) // scratch removed on every outcome
+			switch {
+			case tc.wantReload && cmd == nil:
+				t.Error("success should issue a reload cmd")
+			case !tc.wantReload && cmd != nil:
+				t.Error("failure should not issue a reload cmd")
+			}
+		})
+	}
+}
+
+func TestUpdate_EditFinished_ErrorRemovesScratchNoCommit(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	scratch := writeScratch(t, dir, "x")
+	m := New(nil)
+	m.scratch = scratch
+	m.editLive = filepath.Join(dir, "0001-t.md")
+
+	m, cmd := update(t, m, editFinishedMsg{Err: errors.New("editor blew up")})
+	if cmd != nil {
+		t.Error("editor error should not issue a commit cmd")
+	}
+	if m.scratch != "" || m.editLive != "" {
+		t.Error("edit state not cleared after editor error")
+	}
+	noScratchLeft(t, dir)
+}
+
+func TestUpdate_EditFinished_SuccessIssuesCommit(t *testing.T) {
+	t.Parallel()
+	st, dir := newStoreWith(t, tspec{"0001", ticket.StatusBacklog})
+	livePath, _, _ := st.FindByID("0001")
+	scratch := writeScratch(t, dir, string(validTicketBytes(t, "Edited title")))
+	m := New(st)
+	m.scratch = scratch
+	m.editLive = livePath
+
+	_, cmd := update(t, m, editFinishedMsg{})
+	if cmd == nil {
+		t.Fatal("successful editor exit did not issue a commit cmd")
+	}
+	if _, ok := cmd().(editCommittedMsg); !ok {
+		t.Errorf("commit cmd returned %T, want editCommittedMsg", cmd())
 	}
 }
 

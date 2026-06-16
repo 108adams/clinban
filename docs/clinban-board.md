@@ -34,6 +34,7 @@ becomes a second source of ticket truth.
 | `j` / `↓` | move selection down |
 | `k` / `↑` | move selection up |
 | `ctrl+d` / `ctrl+u` | scroll the preview down / up |
+| `e` | edit the selected ticket in `$EDITOR` |
 | `>` | advance the selected ticket to its next status |
 | `r` | reload the board from disk |
 | `?` | toggle the help bar (short ↔ full) |
@@ -53,6 +54,12 @@ becomes a second source of ticket truth.
   cursor stays on the acted-on ticket even though it re-sorts into another
   group. A ticket already at a terminal status reports "no further status" and
   is not modified.
+- `e` opens the selected ticket in `$EDITOR`. The board edits a same-directory
+  scratch copy (never the live file directly), then re-reads, parses, and lints
+  it; only a clean ticket is committed back through the store. Parse/IO errors
+  and lint violations are surfaced in the status line (reported distinctly) and
+  the original file is left untouched — there is no stdin reopen prompt under
+  the TUI. The terminal is released for the editor and restored on return.
 - `r` re-reads the board from disk; navigation clamps at the first and last
   ticket.
 - Terminal resize is handled; the panes re-fit to the new size.
@@ -64,9 +71,9 @@ This is the terminal-UI **foundation**. The first release:
 - shows **active tickets only** (archived tickets are not listed);
 - renders the preview as **raw Markdown source** — the exact file bytes, never
   re-rendered or re-marshaled;
-- mutates only through the store — status advance (`>`) re-reads fresh and
-  writes via the same path as the CLI; editing is layered on in follow-up work
-  and documented here as it lands.
+- mutates only through the store — status advance (`>`) and edit (`e`) both
+  re-read fresh and write via the same path as the CLI, never from the
+  in-memory snapshot.
 
 See [Architecture](architecture.md) for the package boundary and the decision
 record behind the Charm stack.

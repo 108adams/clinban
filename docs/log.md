@@ -168,3 +168,9 @@ links:
 - Source: `internal/tui/commands.go`, `internal/tui/messages.go`, `internal/tui/model.go`, `internal/tui/keys.go`
 - Updated: `docs/clinban-board.md`, `docs/log.md`
 - Notes: `>` advances the selected ticket to its next status. The status is re-read fresh from disk (`FindByID`+`ReadTicket`), advanced via `fsm.NextStatus`, and written via `store.WriteTicket` — never from the in-memory snapshot, mirroring `clinban move`. A terminal ticket reports "no further status" (no write); errors leave the file unchanged. After a successful advance the board reloads and the cursor stays on the acted-on ticket by ticket ID, even though it re-sorts into another group (shared `withReload`/`applyPendingSelection` helpers, now used by every reload).
+
+## [2026-06-16] feature | board editor handoff + commit gate (ticket 0021, T7)
+
+- Source: `internal/tui/commands.go`, `internal/tui/messages.go`, `internal/tui/model.go`, `internal/tui/keys.go`
+- Updated: `docs/clinban-board.md`, `docs/log.md`
+- Notes: `e` opens the selected ticket in `$EDITOR` via `tea.ExecProcess` with no blocking I/O on the Update path. `beginEdit` fresh-resolves the live path, copies bytes into a same-directory dot-prefixed scratch (`os.CreateTemp`, ignored by `ListActive`), and builds `editor.Command` (stdio unset). On editor exit, `commitEdit` mirrors the CLI edit kernel — read scratch → `AllIDs` → `lint.ValidateForCommit` → `WriteTicket` only when clean. Scratch-read, `AllIDs`-scan, parse, and write failures are surfaced as parse/IO errors, distinct from lint violations; the original file is untouched on any failure, and the scratch is removed on every terminal outcome. No stdin reopen prompt under the alt-screen.
