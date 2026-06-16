@@ -162,3 +162,9 @@ links:
 - Source: `internal/tui/commands.go`, `internal/tui/messages.go`, `internal/tui/model.go`, `internal/tui/keys.go`
 - Updated: `docs/clinban-board.md`, `docs/log.md`
 - Notes: The right pane now previews the selected ticket's raw file bytes (`os.ReadFile` on `Record.Path`, never a re-marshaled Ticket — ADR-4). Selection changes re-load the preview; `ctrl+d`/`ctrl+u` scroll it. Added a test guarding that non-canonical frontmatter is shown verbatim, not normalized.
+
+## [2026-06-16] feature | board status advance (ticket 0021, T6)
+
+- Source: `internal/tui/commands.go`, `internal/tui/messages.go`, `internal/tui/model.go`, `internal/tui/keys.go`
+- Updated: `docs/clinban-board.md`, `docs/log.md`
+- Notes: `>` advances the selected ticket to its next status. The status is re-read fresh from disk (`FindByID`+`ReadTicket`), advanced via `fsm.NextStatus`, and written via `store.WriteTicket` — never from the in-memory snapshot, mirroring `clinban move`. A terminal ticket reports "no further status" (no write); errors leave the file unchanged. After a successful advance the board reloads and the cursor stays on the acted-on ticket by ticket ID, even though it re-sorts into another group (shared `withReload`/`applyPendingSelection` helpers, now used by every reload).

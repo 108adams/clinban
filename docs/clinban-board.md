@@ -34,6 +34,7 @@ becomes a second source of ticket truth.
 | `j` / `↓` | move selection down |
 | `k` / `↑` | move selection up |
 | `ctrl+d` / `ctrl+u` | scroll the preview down / up |
+| `>` | advance the selected ticket to its next status |
 | `r` | reload the board from disk |
 | `?` | toggle the help bar (short ↔ full) |
 | `q` / `ctrl+c` / `esc` | quit |
@@ -46,6 +47,12 @@ becomes a second source of ticket truth.
 - The right pane shows the selected ticket's raw file bytes verbatim (never a
   re-rendered or re-marshaled view); `ctrl+d` / `ctrl+u` scroll it. Changing the
   selection re-loads the preview for the newly selected ticket.
+- `>` advances the selected ticket to its next workflow status (`backlog` →
+  `in-progress` → `done`; `blocked` → `in-progress`). The status is re-read
+  fresh from disk, written through the store, and the board reloads — the
+  cursor stays on the acted-on ticket even though it re-sorts into another
+  group. A ticket already at a terminal status reports "no further status" and
+  is not modified.
 - `r` re-reads the board from disk; navigation clamps at the first and last
   ticket.
 - Terminal resize is handled; the panes re-fit to the new size.
@@ -57,8 +64,9 @@ This is the terminal-UI **foundation**. The first release:
 - shows **active tickets only** (archived tickets are not listed);
 - renders the preview as **raw Markdown source** — the exact file bytes, never
   re-rendered or re-marshaled;
-- is non-mutating — editing and status advance are layered on in follow-up
-  work and documented here as they land.
+- mutates only through the store — status advance (`>`) re-reads fresh and
+  writes via the same path as the CLI; editing is layered on in follow-up work
+  and documented here as it lands.
 
 See [Architecture](architecture.md) for the package boundary and the decision
 record behind the Charm stack.

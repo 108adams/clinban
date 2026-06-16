@@ -47,6 +47,10 @@ type Model struct {
 	err     error  // non-nil when the last load failed
 	status  string // transient status/lint message line
 
+	// pendingSelectID, when non-empty, is the ticket ID to re-select on the next
+	// ticketsLoadedMsg so a reload keeps the cursor on the acted-on ticket.
+	pendingSelectID string
+
 	// scratch and editLive are set during an in-flight edit (T7).
 	scratch  string
 	editLive string
@@ -106,6 +110,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			items[i] = ticketItem{record: r}
 		}
 		cmd := m.list.SetItems(items)
+		m = m.applyPendingSelection()
 		if path, ok := m.selectedPath(); ok {
 			return m, tea.Batch(cmd, loadPreview(path))
 		}
@@ -119,6 +124,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.preview.SetContent(string(msg.Content))
 		return m, nil
 
+	case statusAdvancedMsg:
+		switch {
+		case msg.Err != nil:
+			m.status = "advance: " + msg.Err.Error()
+			return m, nil
+		case msg.NoForward:
+			m.status = "no further status"
+			return m, nil
+		default:
+			m.status = ""
+			return m.withReload()
+		}
+
 	case tea.KeyPressMsg:
 		switch {
 		case isQuit(msg, m.keys):
@@ -130,7 +148,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case isReload(msg, m.keys):
-			return m, loadTickets(m.st)
+			return m.withReload()
+
+		case isAdvance(msg, m.keys):
+			if id, ok := m.selectedID(); ok {
+				return m, advanceStatus(m.st, id)
+			}
+			return m, nil
 
 		case isScrollDown(msg, m.keys):
 			m.preview.HalfPageDown()
@@ -256,6 +280,7 @@ func isUp(msg tea.KeyPressMsg, km keyMap) bool         { return key.Matches(msg,
 func isDown(msg tea.KeyPressMsg, km keyMap) bool       { return key.Matches(msg, km.Down) }
 func isScrollDown(msg tea.KeyPressMsg, km keyMap) bool { return key.Matches(msg, km.ScrollDown) }
 func isScrollUp(msg tea.KeyPressMsg, km keyMap) bool   { return key.Matches(msg, km.ScrollUp) }
+func isAdvance(msg tea.KeyPressMsg, km keyMap) bool    { return key.Matches(msg, km.Advance) }
 
 // selectedPath returns the file path of the currently selected record.
 func (m Model) selectedPath() (string, bool) {
@@ -264,6 +289,47 @@ func (m Model) selectedPath() (string, bool) {
 		return "", false
 	}
 	return m.records[i].Path, true
+}
+
+// selectedID returns the ticket ID of the currently selected record.
+func (m Model) selectedID() (string, bool) {
+	i := m.list.Index()
+	if i < 0 || i >= len(m.records) {
+		return "", false
+	}
+	return m.records[i].Ticket.ID, true
+}
+
+// withReload remembers the currently selected ticket ID and issues a board
+// reload. applyPendingSelection re-selects that ID once the reload lands, so
+// the cursor stays on the acted-on ticket even after it re-sorts into another
+// group. Every reload path goes through here.
+func (m Model) withReload() (tea.Model, tea.Cmd) {
+	if id, ok := m.selectedID(); ok {
+		m.pendingSelectID = id
+	}
+	return m, loadTickets(m.st)
+}
+
+// applyPendingSelection re-selects pendingSelectID in the freshly loaded list.
+// If that ID is gone, it clamps to the nearest valid index. No-op when no
+// selection is pending.
+func (m Model) applyPendingSelection() Model {
+	if m.pendingSelectID == "" {
+		return m
+	}
+	target := m.pendingSelectID
+	m.pendingSelectID = ""
+	for i, r := range m.records {
+		if r.Ticket.ID == target {
+			m.list.Select(i)
+			return m
+		}
+	}
+	if n := len(m.records); n > 0 {
+		m.list.Select(min(m.list.Index(), n-1))
+	}
+	return m
 }
 
 // previewOnChange issues a preview load only when the selection actually moved

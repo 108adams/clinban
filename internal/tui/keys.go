@@ -2,13 +2,14 @@ package tui
 
 import "charm.land/bubbles/v2/key"
 
-// keyMap holds the non-mutating key bindings for the board TUI.
-// Mutating keys (ctrl+d/u, e, >) are added in T5–T7.
+// keyMap holds the board TUI key bindings. ScrollDown/ScrollUp (T5) and Advance
+// (T6) are landed; the editor key (e) arrives in T7.
 type keyMap struct {
 	Up         key.Binding
 	Down       key.Binding
 	ScrollDown key.Binding
 	ScrollUp   key.Binding
+	Advance    key.Binding
 	Reload     key.Binding
 	Help       key.Binding
 	Quit       key.Binding
@@ -33,6 +34,10 @@ func defaultKeyMap() keyMap {
 			key.WithKeys("ctrl+u"),
 			key.WithHelp("ctrl+u", "scroll preview up"),
 		),
+		Advance: key.NewBinding(
+			key.WithKeys(">"),
+			key.WithHelp(">", "advance status"),
+		),
 		Reload: key.NewBinding(
 			key.WithKeys("r"),
 			key.WithHelp("r", "reload"),
@@ -50,7 +55,7 @@ func defaultKeyMap() keyMap {
 
 // ShortHelp returns the short help bindings (for the collapsed help bar).
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.ScrollDown, k.ScrollUp, k.Reload, k.Help, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.ScrollDown, k.ScrollUp, k.Advance, k.Reload, k.Help, k.Quit}
 }
 
 // FullHelp returns the full help bindings grouped by column.
@@ -58,6 +63,6 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down},
 		{k.ScrollDown, k.ScrollUp},
-		{k.Reload, k.Help, k.Quit},
+		{k.Advance, k.Reload, k.Help, k.Quit},
 	}
 }

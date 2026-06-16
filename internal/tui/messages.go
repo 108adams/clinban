@@ -18,3 +18,11 @@ type previewLoadedMsg struct {
 	Content []byte
 	Err     error
 }
+
+// statusAdvancedMsg is sent by advanceStatus. On success both fields are zero.
+// NoForward is true when the ticket is already at a terminal status (no write
+// happened); Err carries any find/read/write failure (snapshot left unchanged).
+type statusAdvancedMsg struct {
+	Err       error
+	NoForward bool
+}
