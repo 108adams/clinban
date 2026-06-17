@@ -17,9 +17,11 @@ var boardCmd = &cobra.Command{
 	Long: `Open the interactive two-pane board.
 
 The left pane lists active tickets in board order (in-progress, blocked,
-backlog, done); the right pane previews the selected ticket. Navigate with
-j/k or the arrow keys, reload with r, toggle help with ?, and quit with q,
-ctrl+c, or esc.`,
+backlog, done); the right pane previews the selected ticket's raw source.
+
+Keys: j/k or arrows select, ctrl+d/ctrl+u scroll the preview, e edits the
+selected ticket in $EDITOR, > advances its status, r reloads, ? toggles the
+help bar, and q/ctrl+c/esc quit.`,
 	Args: cobra.NoArgs,
 	RunE: runBoard,
 }

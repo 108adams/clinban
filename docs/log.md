@@ -3,7 +3,7 @@ title: Documentation Log
 kind: log
 scope: docs
 summary: Records chronological maintenance activity for the Clinban documentation wiki.
-updated: 2026-06-16
+updated: 2026-06-17
 links:
   - index
   - schema
@@ -174,3 +174,9 @@ links:
 - Source: `internal/tui/commands.go`, `internal/tui/messages.go`, `internal/tui/model.go`, `internal/tui/keys.go`
 - Updated: `docs/clinban-board.md`, `docs/log.md`
 - Notes: `e` opens the selected ticket in `$EDITOR` via `tea.ExecProcess` with no blocking I/O on the Update path. `beginEdit` fresh-resolves the live path, copies bytes into a same-directory dot-prefixed scratch (`os.CreateTemp`, ignored by `ListActive`), and builds `editor.Command` (stdio unset). On editor exit, `commitEdit` mirrors the CLI edit kernel — read scratch → `AllIDs` → `lint.ValidateForCommit` → `WriteTicket` only when clean. Scratch-read, `AllIDs`-scan, parse, and write failures are surfaced as parse/IO errors, distinct from lint violations; the original file is untouched on any failure, and the scratch is removed on every terminal outcome. No stdin reopen prompt under the alt-screen.
+
+## [2026-06-17] update | board spike verification + architecture reconciliation (ticket 0021, T8)
+
+- Source: `internal/tui/*`, `internal/board`, `cmd/clinban/board.go`
+- Updated: `docs/architecture.md`, `cmd/clinban/board.go` (help text), `docs/log.md`
+- Notes: Closed the TUI-foundation spike. Added `internal/board` and `internal/tui` to the architecture package map and dependency boundaries. Brought the `clinban board` command help in line with the full landed keymap (e, >, scroll). Confirmed the canonical Charm v2 import paths (`charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`); `go test ./... && go vet ./...` green; gofmt clean. `cmd/clinban/schema.md` rechecked — unchanged (board adds no frontmatter/generated-SCHEMA guidance). Remaining: the manual normal-terminal acceptance checks (resize, editor handoff, and forced-panic terminal restoration) require an interactive TTY and are run by hand.
