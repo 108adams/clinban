@@ -3,7 +3,7 @@ title: Documentation Log
 kind: log
 scope: docs
 summary: Records chronological maintenance activity for the Clinban documentation wiki.
-updated: 2026-06-14
+updated: 2026-06-17
 links:
   - index
   - schema
@@ -156,3 +156,33 @@ links:
 - Source: migration commit `6a0cd17`
 - Updated: `docs/development.md`, `docs/log.md`
 - Notes: Added CI section documenting GitHub Actions workflow; no other wiki pages had stale GitLab or old module path references.
+
+## [2026-06-16] feature | clinban board TUI scaffold (ticket 0021, T4)
+
+- Source: `internal/tui/*`, `cmd/clinban/board.go`
+- Updated: `docs/clinban-board.md` (new), `docs/cli.md`, `docs/index.md`, `docs/log.md`
+- Notes: Added the interactive two-pane board TUI on the Charm stack (Bubble Tea/Bubbles/Lip Gloss v2, `charm.land/...` import paths). First slice is the scaffold: active-ticket list in board order, raw-source preview placeholder, non-mutating keymap (`j`/`k`, `r` reload, `?` help, quit), resize handling, and a whole-board error state. Editing, status advance, and preview scrolling land in T5–T7 and will be documented as they arrive. `cmd/clinban/schema.md` checked — unchanged (board adds no ticket-frontmatter or generated-SCHEMA guidance).
+
+## [2026-06-16] feature | board preview pane (ticket 0021, T5)
+
+- Source: `internal/tui/commands.go`, `internal/tui/messages.go`, `internal/tui/model.go`, `internal/tui/keys.go`
+- Updated: `docs/clinban-board.md`, `docs/log.md`
+- Notes: The right pane now previews the selected ticket's raw file bytes (`os.ReadFile` on `Record.Path`, never a re-marshaled Ticket — ADR-4). Selection changes re-load the preview; `ctrl+d`/`ctrl+u` scroll it. Added a test guarding that non-canonical frontmatter is shown verbatim, not normalized.
+
+## [2026-06-16] feature | board status advance (ticket 0021, T6)
+
+- Source: `internal/tui/commands.go`, `internal/tui/messages.go`, `internal/tui/model.go`, `internal/tui/keys.go`
+- Updated: `docs/clinban-board.md`, `docs/log.md`
+- Notes: `>` advances the selected ticket to its next status. The status is re-read fresh from disk (`FindByID`+`ReadTicket`), advanced via `fsm.NextStatus`, and written via `store.WriteTicket` — never from the in-memory snapshot, mirroring `clinban move`. A terminal ticket reports "no further status" (no write); errors leave the file unchanged. After a successful advance the board reloads and the cursor stays on the acted-on ticket by ticket ID, even though it re-sorts into another group (shared `withReload`/`applyPendingSelection` helpers, now used by every reload).
+
+## [2026-06-16] feature | board editor handoff + commit gate (ticket 0021, T7)
+
+- Source: `internal/tui/commands.go`, `internal/tui/messages.go`, `internal/tui/model.go`, `internal/tui/keys.go`
+- Updated: `docs/clinban-board.md`, `docs/log.md`
+- Notes: `e` opens the selected ticket in `$EDITOR` via `tea.ExecProcess` with no blocking I/O on the Update path. `beginEdit` fresh-resolves the live path, copies bytes into a same-directory dot-prefixed scratch (`os.CreateTemp`, ignored by `ListActive`), and builds `editor.Command` (stdio unset). On editor exit, `commitEdit` mirrors the CLI edit kernel — read scratch → `AllIDs` → `lint.ValidateForCommit` → `WriteTicket` only when clean. Scratch-read, `AllIDs`-scan, parse, and write failures are surfaced as parse/IO errors, distinct from lint violations; the original file is untouched on any failure, and the scratch is removed on every terminal outcome. No stdin reopen prompt under the alt-screen.
+
+## [2026-06-17] update | board spike verification + architecture reconciliation (ticket 0021, T8)
+
+- Source: `internal/tui/*`, `internal/board`, `cmd/clinban/board.go`
+- Updated: `docs/architecture.md`, `cmd/clinban/board.go` (help text), `docs/log.md`
+- Notes: Closed the TUI-foundation spike. Added `internal/board` and `internal/tui` to the architecture package map and dependency boundaries. Brought the `clinban board` command help in line with the full landed keymap (e, >, scroll). Confirmed the canonical Charm v2 import paths (`charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`); `go test ./... && go vet ./...` green; gofmt clean. `cmd/clinban/schema.md` rechecked — unchanged (board adds no frontmatter/generated-SCHEMA guidance). Remaining: the manual normal-terminal acceptance checks (resize, editor handoff, and forced-panic terminal restoration) require an interactive TTY and are run by hand.

@@ -1,6 +1,8 @@
 package lint_test
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -196,7 +198,6 @@ func TestRule2ValidStatus(t *testing.T) {
 			ticket.StatusDone,
 		}
 		for _, s := range validStatuses {
-			s := s
 			t.Run(string(s), func(t *testing.T) {
 				t.Parallel()
 				tk := validTicket()
@@ -236,7 +237,6 @@ func TestRule3ValidType(t *testing.T) {
 			ticket.TypeSpike,
 		}
 		for _, tp := range validTypes {
-			tp := tp
 			t.Run(string(tp), func(t *testing.T) {
 				t.Parallel()
 				tk := validTicket()
@@ -470,5 +470,140 @@ func TestLintAllRulesOrdered(t *testing.T) {
 	// We expect multiple errors; just assert at least one per broken rule.
 	if len(errs) == 0 {
 		t.Fatal("expected multiple lint errors for a maximally broken ticket, got none")
+	}
+}
+
+// --------------------------------------------------------------------------
+// ValidateForCommit tests (T3)
+// --------------------------------------------------------------------------
+
+// validRawTicket returns a minimal valid ticket file as bytes, using the
+// provided ID embedded in the constants (ID is not stored in frontmatter).
+func validRawTicket() []byte {
+	now := time.Now().UTC().Format(time.RFC3339)
+	return fmt.Appendf(nil, "---\ntitle: %s\nstatus: backlog\ntype: task\ntags: []\ncreated: %s\nupdated: %s\n---\n", testTitle, now, now)
+}
+
+// invalidStatusRawTicket returns raw bytes for a ticket whose status value is
+// not one of the recognised statuses, so lint will flag it.
+func invalidStatusRawTicket() []byte {
+	now := time.Now().UTC().Format(time.RFC3339)
+	return fmt.Appendf(nil, "---\ntitle: %s\nstatus: wip\ntype: task\ntags: []\ncreated: %s\nupdated: %s\n---\n", testTitle, now, now)
+}
+
+// invalidFrontmatterRaw returns bytes that cannot be parsed as a ticket at all.
+func invalidFrontmatterRaw() []byte {
+	return []byte("this is not a ticket — no frontmatter\n")
+}
+
+// TestValidateForCommitParseFailure verifies that a parse error returns
+// (nil, nil, parseErr) and the error wraps ticket.ErrMissingFrontmatter.
+func TestValidateForCommitParseFailure(t *testing.T) {
+	t.Parallel()
+
+	got, lintErrs, err := lint.ValidateForCommit(invalidFrontmatterRaw(), testID, testFilename, uniqueIDs())
+
+	if got != nil {
+		t.Errorf("want nil *ticket.Ticket on parse failure, got %+v", got)
+	}
+	if lintErrs != nil {
+		t.Errorf("want nil []LintError on parse failure, got %v", lintErrs)
+	}
+	if err == nil {
+		t.Fatal("want non-nil error on parse failure, got nil")
+	}
+	if !errors.Is(err, ticket.ErrMissingFrontmatter) {
+		t.Errorf("error does not wrap ErrMissingFrontmatter: %v", err)
+	}
+}
+
+// TestValidateForCommitLintViolation verifies that a parseable but invalid
+// ticket returns (t, errs, nil) where errs is non-empty.
+func TestValidateForCommitLintViolation(t *testing.T) {
+	t.Parallel()
+
+	got, lintErrs, err := lint.ValidateForCommit(invalidStatusRawTicket(), testID, testFilename, uniqueIDs())
+
+	if err != nil {
+		t.Fatalf("want nil error on parse success, got %v", err)
+	}
+	if got == nil {
+		t.Fatal("want non-nil *ticket.Ticket when parse succeeds, got nil")
+	}
+	// ID must be injected by ValidateForCommit.
+	if got.ID != testID {
+		t.Errorf("ticket.ID = %q, want %q", got.ID, testID)
+	}
+	if len(lintErrs) == 0 {
+		t.Error("want at least one lint error for invalid status, got none")
+	}
+	// At least one error must name the status field.
+	found := false
+	for _, e := range lintErrs {
+		if e.Field == "status" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected a lint error for field 'status', got: %v", lintErrs)
+	}
+}
+
+// TestValidateForCommitClean verifies that a fully valid ticket returns
+// (t, emptyErrs, nil) where emptyErrs is a non-nil empty slice.
+func TestValidateForCommitClean(t *testing.T) {
+	t.Parallel()
+
+	got, lintErrs, err := lint.ValidateForCommit(validRawTicket(), testID, testFilename, uniqueIDs())
+
+	if err != nil {
+		t.Fatalf("want nil error for clean ticket, got %v", err)
+	}
+	if got == nil {
+		t.Fatal("want non-nil *ticket.Ticket for clean ticket, got nil")
+	}
+	if got.ID != testID {
+		t.Errorf("ticket.ID = %q, want %q", got.ID, testID)
+	}
+	if lintErrs == nil {
+		t.Error("want non-nil empty slice for clean ticket, got nil")
+	}
+	if len(lintErrs) != 0 {
+		t.Errorf("want empty lint errors for clean ticket, got %v", lintErrs)
+	}
+}
+
+// TestValidateForCommitIDInjected verifies that ValidateForCommit injects the
+// supplied id into the ticket regardless of what the raw bytes contain.
+func TestValidateForCommitIDInjected(t *testing.T) {
+	t.Parallel()
+
+	const injectedID = "0099"
+	got, _, err := lint.ValidateForCommit(validRawTicket(), injectedID, testFilename, []string{injectedID})
+
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("want non-nil ticket")
+	}
+	if got.ID != injectedID {
+		t.Errorf("ticket.ID = %q, want %q", got.ID, injectedID)
+	}
+}
+
+// TestValidateForCommitLintErrsNeverNilOnSuccess verifies that even when there
+// are no lint violations, lintErrs is a non-nil slice (not nil).
+func TestValidateForCommitLintErrsNeverNilOnSuccess(t *testing.T) {
+	t.Parallel()
+
+	_, lintErrs, err := lint.ValidateForCommit(validRawTicket(), testID, testFilename, uniqueIDs())
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if lintErrs == nil {
+		t.Error("lintErrs must be non-nil (empty slice) when ticket is valid; got nil")
 	}
 }

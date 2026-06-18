@@ -4,24 +4,16 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/108adams/clinban/internal/board"
 	"github.com/108adams/clinban/internal/store"
 	"github.com/108adams/clinban/internal/ticket"
 )
-
-// statusOrder defines the list display order. Lower values sort earlier.
-var statusOrder = map[ticket.Status]int{
-	ticket.StatusInProgress: 0,
-	ticket.StatusBlocked:    1,
-	ticket.StatusBacklog:    2,
-	ticket.StatusDone:       3,
-}
 
 // listFlags holds the parsed flag values for the list command.
 type listFlags struct {
@@ -124,17 +116,10 @@ func hasTag(tags []string, target string) bool {
 }
 
 // sortRecords sorts records in the documented board order, then by numeric ID.
+// Ordering is delegated to board.Less.
 func sortRecords(records []store.Record) {
 	sort.SliceStable(records, func(i, j int) bool {
-		oi := statusOrder[records[i].Ticket.Status]
-		oj := statusOrder[records[j].Ticket.Status]
-		if oi != oj {
-			return oi < oj
-		}
-		// Within the same status group, sort ascending by numeric ID.
-		ni, _ := strconv.Atoi(records[i].Ticket.ID)
-		nj, _ := strconv.Atoi(records[j].Ticket.ID)
-		return ni < nj
+		return board.Less(records[i].Ticket, records[j].Ticket)
 	})
 }
 

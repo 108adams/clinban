@@ -3,12 +3,13 @@ title: CLI Reference
 kind: reference
 scope: cli
 summary: Documents Clinban commands, expected outputs, and exit-code conventions.
-updated: 2026-06-15
+updated: 2026-06-16
 links:
   - ticket-schema
   - configuration
   - validation
   - storage
+  - clinban-board
 ---
 
 # CLI Reference
@@ -105,6 +106,12 @@ Filters:
 - `--tag <value>`
 
 Multiple filters combine with AND logic.
+
+## `clinban board`
+
+Opens an interactive two-pane terminal UI over the active tickets. The left pane lists active tickets in the same board order as `clinban list`; the right pane previews the selected ticket. Navigate with `j`/`k` or the arrow keys, reload with `r`, toggle the help bar with `?`, and quit with `q`, `ctrl+c`, or `esc`.
+
+The board is a read-and-act view that goes through the same store and workflow rules as the CLI; it shows active tickets only and previews raw Markdown source. See the [Board TUI](clinban-board.md) reference for the full keymap and boundaries.
 
 ## `clinban show <id>`
 
