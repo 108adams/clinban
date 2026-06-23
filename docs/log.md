@@ -186,3 +186,9 @@ links:
 - Source: `internal/tui/*`, `internal/board`, `cmd/clinban/board.go`
 - Updated: `docs/architecture.md`, `cmd/clinban/board.go` (help text), `docs/log.md`
 - Notes: Closed the TUI-foundation spike. Added `internal/board` and `internal/tui` to the architecture package map and dependency boundaries. Brought the `clinban board` command help in line with the full landed keymap (e, >, scroll). Confirmed the canonical Charm v2 import paths (`charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`); `go test ./... && go vet ./...` green; gofmt clean. `cmd/clinban/schema.md` rechecked — unchanged (board adds no frontmatter/generated-SCHEMA guidance). Remaining: the manual normal-terminal acceptance checks (resize, editor handoff, and forced-panic terminal restoration) require an interactive TTY and are run by hand.
+
+## [2026-06-23] fix | tickets skill SCHEMA.md reference + stale root schema
+
+- Source: `cmd/clinban/skills/tickets/SKILL.md`, `SCHEMA.md`
+- Updated: `docs/log.md`
+- Notes: The tickets skill Activation block told agents to read `SCHEMA.md` with no path, implying a sibling of `SKILL.md`. `clinban init` actually writes `SCHEMA.md` to the project root and `SKILL.md` to `.claude/skills/tickets/`, so agents looked in the skill dir and failed. Reworded Activation to point at the project-root `SCHEMA.md` and made its absence non-fatal (skill + binary suffice when the skill is installed globally, outside an initialized project). Also regenerated the committed root `SCHEMA.md` from the authoritative embed source `cmd/clinban/schema.md` — the tracked copy had drifted (claimed 7 frontmatter fields and `id` in frontmatter; current schema is 6 fields with `id` derived from the filename, plus `clinban edit`/`remove`/`resolve`). Embed source unchanged. Init tests green (9 passed).

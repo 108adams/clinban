@@ -39,10 +39,9 @@ Complete example:
 
 ```markdown
 ---
-id: "0042"
+title: "Fix login timeout on staging"
 status: "in-progress"
 type: "bug"
-title: "Fix login timeout on staging"
 tags: ["auth", "backend"]
 created: "2026-05-18T14:30:00Z"
 updated: "2026-05-18T15:00:00Z"
@@ -59,7 +58,7 @@ Describe the problem here. Markdown is supported.
 - [ ] Fix deployed to staging
 ```
 
-All seven frontmatter fields must be present. Do not add extra frontmatter
+All six frontmatter fields must be present. Do not add extra frontmatter
 fields; Clinban ignores them but they clutter the file.
 
 ---
@@ -68,19 +67,30 @@ fields; Clinban ignores them but they clutter the file.
 
 | Field | Required | Owner | Constraints |
 |-------|----------|-------|-------------|
-| `id` | required | Clinban (tool) | Four zero-padded decimal digits: `0001`–`9999`. Unique across active and archived tickets. Never set or change this field manually. |
-| `status` | required | Clinban (tool) via `clinban move` | One of: `backlog`, `in-progress`, `blocked`, `done`. Change only through `clinban move`; see Section 5 for valid transitions. |
-| `type` | required | Author | One of: `bug`, `task`, `feature`, `spike`. |
 | `title` | required | Author | Non-empty string. |
+| `status` | required | Clinban (tool) via `clinban move` | One of: `backlog`, `in-progress`, `blocked`, `done`. Change only through `clinban move`; see Section 5 for valid transitions. The new-ticket template includes a `# states: backlog, in-progress, blocked, done` hint comment below this field. |
+| `type` | required | Author | One of: `bug`, `task`, `feature`, `spike`. |
 | `tags` | optional | Author | YAML sequence of strings. Use an empty sequence `[]` when there are no tags. |
 | `created` | required | Clinban (tool) | RFC 3339 timestamp (e.g. `2026-05-18T14:30:00Z`). Set by Clinban on creation or registration. Do not change this field. |
 | `updated` | required | Clinban (tool) | RFC 3339 timestamp. Refreshed by Clinban on every write. Do not change this field. |
 
+**Ticket ID:**
+
+The ticket ID is **not** stored in frontmatter. Clinban derives it exclusively
+from the filename's four-digit prefix (e.g. `0042` in `0042-fix-login.md`).
+When reading a ticket, the store injects the ID from the filename. When writing,
+the ID is encoded only in the filename. Never add an `id:` line to frontmatter.
+
 **Field ownership rules:**
 
-- Fields owned by Clinban (`id`, `created`, `updated`) are set and maintained
-  by the tool. If you write a ticket file directly, omit those fields and let
-  Clinban fill them in — or use `clinban register` which will overwrite them.
+- Fields owned by Clinban (`created`, `updated`) are set and maintained
+  by the tool. There are two paths for writing ticket files:
+  - **Via `clinban register <path>`:** you may omit `created` and `updated`;
+    the tool sets them for you.
+  - **Writing directly into the managed directory:** you must include valid
+    RFC 3339 timestamps for both `created` and `updated`. `clinban lint` checks
+    for zero values and will reject any file that is missing these fields or has
+    them set to the zero timestamp.
 - `status` is initialized by Clinban and must only be changed through
   `clinban move`. Direct edits to `status` bypass transition validation.
 - `type`, `title`, and `tags` are owned by the author and may be edited freely.
@@ -120,16 +130,14 @@ Archived tickets use the same filename pattern and are stored in `archive_dir`.
 
 ## 5. Status Transitions
 
-`status` must progress along this directed graph. Only the five edges listed
+`status` must progress along this directed graph. Only the six edges listed
 below are valid; any other transition is rejected by `clinban move`.
 
 ```
 backlog ──► in-progress ──► done ──► backlog
-                │                      ▲
-                ▼                      │
-            blocked ──────────────────►┘
-              │
-              └──────────────► in-progress
+  │              │
+  │              ▼
+  └──────────► blocked ──► in-progress
 ```
 
 Valid transitions:
@@ -137,6 +145,7 @@ Valid transitions:
 | From | To | Meaning |
 |------|----|---------|
 | `backlog` | `in-progress` | Work has started |
+| `backlog` | `blocked` | Ticket is blocked before work begins |
 | `in-progress` | `blocked` | Work is stalled on an external dependency |
 | `in-progress` | `done` | Work is complete |
 | `blocked` | `in-progress` | Blocker resolved; work resuming |
@@ -154,30 +163,27 @@ Follow these steps exactly. Do not skip or reorder steps.
 ### 6.1 Create a ticket
 
 1. Read `.clinban` to find `tickets_dir`.
-2. Run `clinban new --title "<title>" --type <type> [--tags tag1,tag2]`.
-   - `<type>` must be one of: `bug`, `task`, `feature`, `spike`.
-   - Tags are optional and comma-separated.
+2. Run `clinban new --no-interactive --title "<title>" --type <type> [--tags tag1,tag2] [--body "<body>"]`.
+   - `--no-interactive` is required for non-interactive/agent use; without it the
+     command opens `$EDITOR` and blocks.
+   - `<type>` must be one of: `bug`, `task`, `feature`, `spike`. If `default_type`
+     is set to a valid type in `.clinban`, `--type` may be omitted.
+   - `--tags` is optional and comma-separated.
+   - `--body` is optional Markdown body text.
 3. The command prints the new ticket's filename to stdout (e.g.
    `created: 0043-my-new-ticket.md`). Record the ID from that filename.
-4. To add a body, open the file at `<tickets_dir>/<filename>` and append
-   Markdown below the closing `---` of the frontmatter. Do not edit the
-   frontmatter fields.
 
 ### 6.2 Update a ticket
 
-To change `title`, `type`, or `tags`:
-
-1. Run `clinban edit <id> --title "<new title>"` (and/or `--type <new type>`,
-   `--tags tag1,tag2`).
-2. Clinban updates the frontmatter and refreshes `updated`.
-
-To change the body only:
-
-1. Open the file at `<tickets_dir>/<id>-<slug>.md` (use `clinban show <id>` or
-   list the directory to find the exact filename).
-2. Edit the Markdown content below the closing `---`.
-3. Do not modify any frontmatter field — Clinban owns `id`, `created`, and
-   `updated`; changing them manually produces an inconsistent state.
+1. Run `clinban edit <id>`.
+2. Clinban opens the ticket in `$EDITOR` on a temporary copy.
+3. Edit the desired frontmatter fields (`type`, `title`, `tags`) or the body.
+4. Save and close the editor. Clinban validates the result and writes the ticket
+   only if parse and lint pass; on failure it prompts to reopen.
+5. Do not rename the ticket file or add an `id:` frontmatter line — the ticket
+   ID is derived from the filename's four-digit prefix and must not appear in
+   frontmatter. Do not edit `created` or `updated` — Clinban refreshes `updated`
+   automatically on every write.
 
 ### 6.3 Move status
 
@@ -201,3 +207,28 @@ Archiving moves a `done` ticket from `tickets_dir` to `archive_dir`.
 4. Archived tickets are read-only from the perspective of normal operations.
    To reopen an archived ticket, run `clinban move <id> backlog`, which moves
    it back to `tickets_dir` with `status: backlog`.
+
+### 6.5 Remove a ticket
+
+Removing permanently deletes the ticket file from disk (active or archive
+directory). Use this only when a ticket should be fully discarded.
+
+1. Run `clinban remove <id>`.
+2. Clinban deletes the file. The ID is freed for reuse (though `clinban new`
+   will not reuse it — it always takes `max+1`).
+3. If no file matches the ID, Clinban exits 1 with `ticket not found`.
+4. If multiple files share the ID (a collision), Clinban exits 1, lists all
+   colliding filenames, and suggests running `clinban lint` to diagnose.
+
+### 6.6 Resolve duplicate IDs
+
+Use this when git sync introduces multiple ticket files with the same
+four-digit filename prefix.
+
+1. Run `clinban lint` to confirm the collision.
+2. Run `clinban resolve`.
+3. Clinban keeps the oldest ticket in each duplicate-ID group at the original
+   ID and renames younger tickets to the next available IDs.
+4. Ticket contents are not rewritten; `updated` is unchanged.
+5. Run `clinban lint` again. ID uniqueness errors should be gone, though
+   unrelated schema errors may still remain.
