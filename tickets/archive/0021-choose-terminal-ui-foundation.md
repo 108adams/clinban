@@ -4,7 +4,7 @@ status: done
 type: spike
 tags: [tui, adr, discovery]
 created: 2026-06-10T18:19:55+02:00
-updated: 2026-06-18T15:17:08.687413765+02:00
+updated: 2026-08-13T13:00:30.669993654+02:00
 ---
 
 # ADR: Terminal UI foundation
