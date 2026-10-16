@@ -12,6 +12,7 @@ import (
 	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/108adams/clinban/internal/board"
 	"github.com/108adams/clinban/internal/lint"
@@ -70,12 +71,18 @@ func New(st *store.Store) Model {
 
 	vp := viewport.New()
 
+	h := help.New()
+	h.Styles.ShortKey = lipgloss.NewStyle().Bold(true)
+	h.Styles.ShortDesc = lipgloss.NewStyle().Bold(true)
+	h.Styles.FullKey = lipgloss.NewStyle().Bold(true)
+	h.Styles.FullDesc = lipgloss.NewStyle().Bold(true)
+
 	return Model{
 		st:      st,
 		list:    l,
 		preview: vp,
 		keys:    defaultKeyMap(),
-		help:    help.New(),
+		help:    h,
 	}
 }
 

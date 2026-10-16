@@ -14,13 +14,16 @@ ever corrupting frontmatter or bypassing FSM transitions.
 
 ## Activation
 
-Read these first:
+Read first:
 
-1. `SCHEMA.md` — authoritative field rules, FSM transitions, and agent operation steps
-2. `.clinban` — find `tickets_dir` and `archive_dir` before touching any file
+1. `.clinban` (in the project root) — find `tickets_dir` and `archive_dir` before touching any file
+2. `SCHEMA.md` **in the project root** (created by `clinban init`, *not* a sibling of this skill) —
+   the authoritative field rules, FSM transitions, and agent operation steps. If it is present, read
+   it; it is your source of truth and this skill adds LLM reasoning guidance on top of it.
 
-Do not proceed without reading both. SCHEMA.md is your source of truth; this skill adds
-LLM reasoning guidance on top of it.
+If `SCHEMA.md` is absent (e.g. this skill is installed globally, outside an initialized project),
+do not block: this skill plus the `clinban` binary are sufficient. The binary is the authoritative
+validator — run `clinban <command> --help` and `clinban lint` when in doubt rather than guessing.
 
 ---
 
