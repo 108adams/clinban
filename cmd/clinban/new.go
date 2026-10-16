@@ -13,6 +13,7 @@ import (
 	"github.com/108adams/clinban/internal/editor"
 	"github.com/108adams/clinban/internal/lint"
 	"github.com/108adams/clinban/internal/slug"
+	"github.com/108adams/clinban/internal/store"
 	"github.com/108adams/clinban/internal/template"
 	"github.com/108adams/clinban/internal/ticket"
 )
@@ -106,7 +107,7 @@ func runNewInteractive(raw string) error {
 
 	// Create a temp file in TicketsDir (same filesystem as final destination
 	// — required for os.Rename to work atomically per ADR-3).
-	tmpFile, err := os.CreateTemp(st.TicketsDir, ".clinban-*.md")
+	tmpFile, err := store.CreateTemp(st.TicketsDir, ".clinban-*.md")
 	if err != nil {
 		return fmt.Errorf("new: create temp file: %w", err)
 	}

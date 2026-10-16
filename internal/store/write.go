@@ -1,9 +1,14 @@
 package store
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/108adams/clinban/internal/ticket"
 )
@@ -35,15 +40,22 @@ func (s *Store) ReadTicket(path string) (*ticket.Ticket, error) {
 // temporary file followed by rename.
 //
 // The temporary file is created in the target directory so the final rename is
-// on the same filesystem. WriteTicket does not modify t; callers are responsible
-// for setting system-owned fields such as Updated before calling.
+// on the same filesystem. Overwriting an existing file keeps its permission
+// bits; a new file gets 0666 minus the process umask (see CreateTemp).
+// WriteTicket does not modify t; callers are responsible for setting
+// system-owned fields such as Updated before calling.
 func (s *Store) WriteTicket(t *ticket.Ticket, path string) error {
 	b, err := ticket.Marshal(t)
 	if err != nil {
 		return fmt.Errorf("store: write ticket: marshal: %w", err)
 	}
 
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".clinban-*.tmp")
+	existing, err := os.Stat(path)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("store: write ticket: stat: %w", err)
+	}
+
+	tmp, err := CreateTemp(filepath.Dir(path), ".clinban-*.tmp")
 	if err != nil {
 		return fmt.Errorf("store: write ticket: create temp: %w", err)
 	}
@@ -54,10 +66,12 @@ func (s *Store) WriteTicket(t *ticket.Ticket, path string) error {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("store: write ticket: write temp: %w", err)
 	}
-	if err := tmp.Chmod(0o600); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("store: write ticket: chmod temp: %w", err)
+	if existing != nil {
+		if err := tmp.Chmod(existing.Mode().Perm()); err != nil {
+			_ = tmp.Close()
+			_ = os.Remove(tmpPath)
+			return fmt.Errorf("store: write ticket: chmod temp: %w", err)
+		}
 	}
 	if err := tmp.Sync(); err != nil {
 		_ = tmp.Close()
@@ -78,6 +92,30 @@ func (s *Store) WriteTicket(t *ticket.Ticket, path string) error {
 		_ = dir.Close()
 	}
 	return nil
+}
+
+// CreateTemp creates a new temporary file in dir, like os.CreateTemp, but with
+// mode 0666 minus the process umask instead of os.CreateTemp's fixed 0600.
+//
+// Ticket files are renamed from temp files into place, so the temp file's mode
+// becomes the ticket's mode. A fixed 0600 makes tickets unreadable to other
+// users of a shared checkout, such as a container running under another uid.
+// The last "*" in pattern is replaced by a random string; without "*" the
+// random string is appended.
+func CreateTemp(dir, pattern string) (*os.File, error) {
+	prefix, suffix := pattern, ""
+	if i := strings.LastIndex(pattern, "*"); i >= 0 {
+		prefix, suffix = pattern[:i], pattern[i+1:]
+	}
+	for range 10000 {
+		name := filepath.Join(dir, prefix+strconv.FormatUint(uint64(rand.Uint32()), 10)+suffix)
+		f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
+		if errors.Is(err, fs.ErrExist) {
+			continue
+		}
+		return f, err
+	}
+	return nil, &fs.PathError{Op: "createtemp", Path: filepath.Join(dir, pattern), Err: fs.ErrExist}
 }
 
 // TicketPath returns the canonical active path for id and slug.
