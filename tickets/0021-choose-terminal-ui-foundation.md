@@ -1,10 +1,10 @@
 ---
 title: Choose terminal UI foundation
-status: in-progress
+status: done
 type: spike
 tags: [tui, adr, discovery]
 created: 2026-06-10T18:19:55+02:00
-updated: 2026-06-15T09:38:05.721840509+02:00
+updated: 2026-06-18T17:21:12.395435309+02:00
 ---
 
 # ADR: Terminal UI foundation
