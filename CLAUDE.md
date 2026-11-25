@@ -43,6 +43,9 @@ gofmt -w <changed-files>
 - `cmd/clinban/init_test.go` uses binary integration tests (`buildBinary(t)` + `exec.Command`), not unit tests. New init tests must follow this pattern.
 - Use `os.MkdirAll` when creating nested dirs (e.g. `.claude/skills/tickets/`); `os.Mkdir` for single-level only.
 
+## Branch policy
+Working branch: `main` — commit and push directly. Never force push.
+
 ## Commit Hygiene
 
 - One commit per logical unit of work (domain change → store → CLI → tests → docs).
